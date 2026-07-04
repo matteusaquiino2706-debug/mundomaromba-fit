@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editar Lote - Mundo Maromba Fit</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        /* ===== ESTILOS DA PÁGINA DE EDIÇÃO ===== */
+        body {
+            background: #0a0a12;
+            font-family: 'Inter', sans-serif;
+            color: #fff;
+            min-height: 100vh;
+        }
+
+        .editar-container {
+            max-width: 800px;
+            margin: 40px auto;
+            background: rgba(255,255,255,0.03);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 30px;
+            border: 1px solid rgba(255,255,255,0.06);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
+
+        .editar-container h1 {
+            color: #F5A623;
+            margin-bottom: 10px;
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .produto-titulo {
+            background: rgba(0,0,0,0.3);
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            text-align: center;
+            border: 1px solid rgba(245, 166, 35, 0.1);
+        }
+
+        .produto-titulo strong {
+            color: #F5A623;
+            font-size: 18px;
+        }
+
+        .produto-titulo small {
+            color: #888;
+            font-size: 13px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #aaa;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .form-group label i {
+            color: #F5A623;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 12px;
+            background: rgba(255,255,255,0.04);
+            color: #fff;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            border-color: #F5A623;
+            outline: none;
+            box-shadow: 0 0 0 4px rgba(245, 166, 35, 0.1);
+            background: rgba(255,255,255,0.06);
+        }
+
+        .form-group input[readonly] {
+            background: rgba(255,255,255,0.02);
+            color: #888;
+            border-color: transparent;
+        }
+
+        .form-group input::placeholder {
+            color: #555;
+        }
+
+        .btn-salvar {
+            background: linear-gradient(135deg, #F5A623, #E67E22);
+            color: #fff;
+            border: none;
+            padding: 14px 32px;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            font-family: 'Inter', sans-serif;
+            box-shadow: 0 4px 20px rgba(245, 166, 35, 0.2);
+        }
+
+        .btn-salvar:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 35px rgba(245, 166, 35, 0.35);
+        }
+
+        .btn-voltar {
+            background: rgba(255,255,255,0.06);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.08);
+            padding: 14px 32px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: 'Inter', sans-serif;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-voltar:hover {
+            background: rgba(255,255,255,0.1);
+        }
+
+        .btn-cancelar {
+            background: rgba(255, 152, 0, 0.15);
+            color: #ff9800;
+            border: 1px solid rgba(255, 152, 0, 0.2);
+            padding: 14px 32px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: 'Inter', sans-serif;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-cancelar:hover {
+            background: rgba(255, 152, 0, 0.25);
+        }
+
+        .btn-excluir {
+            background: rgba(244, 67, 54, 0.15);
+            color: #f44336;
+            border: 1px solid rgba(244, 67, 54, 0.2);
+            padding: 14px 32px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: 'Inter', sans-serif;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-excluir:hover {
+            background: rgba(244, 67, 54, 0.25);
+        }
+
+        .cancelar-box {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255,255,255,0.06);
+        }
+
+        .cancelar-box h3 {
+            color: #ff9800;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .quantidade-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .quantidade-group input {
+            flex: 2;
+        }
+
+        .quantidade-group button {
+            flex: 1;
+            background: rgba(255, 152, 0, 0.15);
+            color: #ff9800;
+            border: 1px solid rgba(255, 152, 0, 0.2);
+            padding: 12px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: 'Inter', sans-serif;
+            font-weight: 600;
+        }
+
+        .quantidade-group button:hover {
+            background: rgba(255, 152, 0, 0.25);
+        }
+
+        .message {
+            margin-top: 20px;
+            padding: 12px 16px;
+            border-radius: 12px;
+            text-align: center;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .message.sucesso {
+            background: rgba(76, 175, 80, 0.15);
+            border: 1px solid rgba(76, 175, 80, 0.2);
+            color: #4caf50;
+        }
+
+        .message.erro {
+            background: rgba(244, 67, 54, 0.15);
+            border: 1px solid rgba(244, 67, 54, 0.2);
+            color: #f44336;
+        }
+
+        .detalhes-produto {
+            background: rgba(0,0,0,0.2);
+            padding: 12px 16px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-weight: 600;
+            color: #aaa;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .detalhes-produto i {
+            color: #F5A623;
+        }
+
+        .warning {
+            color: #ff9800;
+            font-size: 12px;
+            margin-top: 4px;
+            display: block;
+        }
+
+        .preview-imagem {
+            margin-top: 10px;
+            padding: 15px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 10px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .preview-imagem img {
+            max-width: 100%;
+            max-height: 150px;
+            border-radius: 8px;
+        }
+
+        .preview-imagem .sem-imagem {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .acoes-botoes {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+
+        /* ===== CORREÇÃO DROPDOWNS ===== */
+        select option {
+            color: #fff !important;
+            background: #1a1a2e !important;
+            padding: 8px 12px !important;
+            font-size: 14px !important;
+        }
+
+        select {
+            color: #fff !important;
+            background: rgba(255, 255, 255, 0.05) !important;
+        }
+
+        select option:hover,
+        select option:focus,
+        select option:checked {
+            background: #F5A623 !important;
+            color: #fff !important;
+        }
+
+        /* ===== RESPONSIVO ===== */
+        @media (max-width: 768px) {
+            .editar-container {
+                margin: 20px;
+                padding: 20px;
+            }
+            .quantidade-group {
+                flex-direction: column;
+            }
+            .acoes-botoes {
+                flex-direction: column;
+            }
+            .acoes-botoes button {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="editar-container">
+        <h1><i class="fas fa-edit"></i> Editar Lote</h1>
+        <div id="produtoTitulo" class="produto-titulo">Carregando...</div>
+
+        <form id="editarForm">
+            <div class="detalhes-produto"><i class="fas fa-box"></i> Informações do Lote</div>
+
+            <div class="form-group">
+                <label><i class="far fa-calendar-alt"></i> Data da compra:</label>
+                <input type="date" id="dataCompra" required>
+            </div>
+
+            <div class="form-group">
+                <label><i class="fas fa-tag"></i> Nome do produto:</label>
+                <input type="text" id="nome" required>
+            </div>
+
+            <div class="form-group">
+                <label><i class="fas fa-tag"></i> Marca:</label>
+                <input type="text" id="marca" required>
+            </div>
+
+            <div class="form-group">
+                <label><i class="fas fa-weight-hanging"></i> Peso/Volume:</label>
+                <input type="text" id="peso" required>
+            </div>
+
+            <div class="form-group">
+                <label><i class="fas fa-utensils"></i> Sabor:</label>
+                <input type="text" id="sabor" placeholder="Ex: Morango, Sem sabor">
+            </div>
+
+            <div class="form-group">
+                <label><i class="fas fa-layer-group"></i> Família:</label>
+                <select id="familia" required>
+                    <option value="">Selecione...</option>
+                    <option value="Pre Treino">Pré Treino</option>
+                    <option value="Creatina">Creatina</option>
+                    <option value="Whey">Whey</option>
+                    <option value="Termogenico">Termogênico</option>
+                    <option value="Hipercalorico">Hipercalórico</option>
+                    <option value="BCAA">BCAA</option>
+                    <option value="Diuretico">Diurético</option>
+                    <option value="Barra Cereal">Barra Cereal</option>
+                    <option value="Outros">Outros</option>
+                </select>
+            </div>
+
+            <div class="detalhes-produto"><i class="fas fa-image"></i> Imagem do Produto</div>
+
+            <div class="form-group">
+                <label><i class="fas fa-link"></i> URL da imagem:</label>
+                <input type="url" id="imagemProduto" placeholder="https://i.ibb.co/xxxxx/produto.jpg">
+                <small style="color:#888; display:block; margin-top:4px; font-size:12px;">
+                    <i class="fas fa-info-circle"></i> Use ImgBB, Postimages ou Google Drive para hospedar a imagem.
+                    <br>Exemplo: https://i.ibb.co/Rp3Sjz5V/CREATINA-MAX.jpg
+                </small>
+            </div>
+
+            <div class="preview-imagem" id="previewContainer">
+                <span class="sem-imagem"><i class="fas fa-image"></i> Nenhuma imagem carregada</span>
+            </div>
+
+            <div class="detalhes-produto"><i class="fas fa-coins"></i> Valores</div>
+
+            <div class="form-group">
+                <label><i class="fas fa-money-bill-wave"></i> Preço de custo unitário (R$):</label>
+                <input type="number" id="valorUnitario" step="0.01" required>
+            </div>
+
+            <div class="form-group">
+                <label><i class="fas fa-chart-line"></i> Simulação 40% (automático):</label>
+                <input type="text" id="simulacao40" readonly>
+            </div>
+
+            <div class="form-group">
+                <label><i class="fas fa-tag"></i> Preço sugerido (venda) (R$):</label>
+                <input type="number" id="valorSugerido" step="0.01" placeholder="Digite o preço de venda">
+            </div>
+
+            <div class="detalhes-produto"><i class="fas fa-boxes"></i> Estoque</div>
+
+            <div class="form-group">
+                <label><i class="fas fa-hashtag"></i> Saldo disponível (unidades):</label>
+                <input type="number" id="quantidadeEstoque" step="1" required>
+                <small class="warning"><i class="fas fa-exclamation-triangle"></i> Este é o saldo disponível (quantidade total - já vendido)</small>
+            </div>
+
+            <div class="acoes-botoes">
+                <button type="submit" class="btn-salvar"><i class="fas fa-save"></i> Salvar Alterações</button>
+                <button type="button" id="voltarBtn" class="btn-voltar"><i class="fas fa-arrow-left"></i> Voltar</button>
+            </div>
+        </form>
+
+        <div class="cancelar-box">
+            <h3><i class="fas fa-exclamation-triangle"></i> Área de Cancelamento</h3>
+            <p style="color:#888; font-size:14px;">Use esta opção para cancelar parte deste lote (ex: problema na NF, produto danificado)</p>
+            
+            <div class="form-group" style="margin-top:15px;">
+                <label><i class="fas fa-minus-circle"></i> Quantidade a cancelar (remover deste lote):</label>
+                <div class="quantidade-group">
+                    <input type="number" id="quantidadeCancelar" step="1" min="1" placeholder="Quantidade">
+                    <button type="button" id="cancelarCompraBtn"><i class="fas fa-times"></i> Cancelar do Lote</button>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label><i class="fas fa-info-circle"></i> Motivo do cancelamento:</label>
+                <select id="motivoCancelamento">
+                    <option value="Problema na NF">Problema na NF</option>
+                    <option value="Produto danificado na compra">Produto danificado na compra</option>
+                    <option value="Erro no cadastro">Erro no cadastro</option>
+                    <option value="Devolução para fornecedor">Devolução para fornecedor</option>
+                    <option value="Outro">Outro</option>
+                </select>
+            </div>
+
+            <button type="button" id="excluirProdutoBtn" class="btn-excluir" style="margin-top:10px;">
+                <i class="fas fa-trash"></i> Excluir Lote (cuidado!)
+            </button>
+        </div>
+
+        <div id="message" class="message"></div>
+    </div>
+
+    <script type="module" src="firebase-config.js"></script>
+    <script type="module" src="editar-produto.js"></script>
+</body>
+</html>

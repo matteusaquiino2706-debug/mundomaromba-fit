@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mundo Maromba Fit - Login</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        /* ===== TELA DE LOGIN MODERNA ===== */
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: #0a0a12;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Inter', sans-serif;
+            background-image: 
+                radial-gradient(ellipse at 10% 20%, rgba(245, 166, 35, 0.06) 0%, transparent 50%),
+                radial-gradient(ellipse at 90% 80%, rgba(230, 126, 34, 0.03) 0%, transparent 50%);
+        }
+
+        .login-container {
+            width: 100%;
+            max-width: 420px;
+            padding: 20px;
+        }
+
+        .login-box {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: 24px;
+            padding: 40px 36px;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            box-shadow: 0 8px 40px rgba(0, 0, 0, 0.4);
+            text-align: center;
+        }
+
+        .login-box .logo-login {
+            max-width: 180px;
+            margin: 0 auto 24px auto;
+            display: block;
+            filter: drop-shadow(0 0 30px rgba(245, 166, 35, 0.15));
+        }
+
+        .login-box .brand-name {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 22px;
+            font-weight: 900;
+            background: linear-gradient(135deg, #F5A623, #E67E22);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: 1px;
+            margin-bottom: 4px;
+        }
+
+        .login-box .brand-sub {
+            font-size: 12px;
+            color: #F5A623;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            font-weight: 600;
+            opacity: 0.7;
+            margin-bottom: 28px;
+        }
+
+        .login-box .login-title {
+            font-size: 14px;
+            color: #888;
+            font-weight: 500;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .login-box .login-title i {
+            color: #F5A623;
+        }
+
+        .login-box .input-group {
+            position: relative;
+            margin-bottom: 14px;
+        }
+
+        .login-box .input-group i {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #555;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .login-box .input-group input {
+            width: 100%;
+            padding: 14px 16px 14px 48px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.04);
+            color: #fff;
+            font-size: 15px;
+            transition: all 0.3s ease;
+            font-family: 'Inter', sans-serif;
+            box-sizing: border-box;
+        }
+
+        .login-box .input-group input:focus {
+            border-color: #F5A623;
+            outline: none;
+            box-shadow: 0 0 0 4px rgba(245, 166, 35, 0.08);
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .login-box .input-group input::placeholder {
+            color: #555;
+        }
+
+        .login-box .input-group input:focus + i,
+        .login-box .input-group input:focus ~ i {
+            color: #F5A623;
+        }
+
+        .login-box .btn-login {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #F5A623, #E67E22);
+            border: none;
+            border-radius: 12px;
+            color: #fff;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            box-shadow: 0 4px 20px rgba(245, 166, 35, 0.2);
+            margin-top: 8px;
+        }
+
+        .login-box .btn-login:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 35px rgba(245, 166, 35, 0.3);
+        }
+
+        .login-box .btn-login:active {
+            transform: translateY(0);
+        }
+
+        .login-box .message {
+            margin-top: 16px;
+            padding: 10px 14px;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .login-box .message.sucesso {
+            background: rgba(76, 175, 80, 0.12);
+            border: 1px solid rgba(76, 175, 80, 0.15);
+            color: #4caf50;
+        }
+
+        .login-box .message.erro {
+            background: rgba(244, 67, 54, 0.12);
+            border: 1px solid rgba(244, 67, 54, 0.15);
+            color: #f44336;
+        }
+
+        .login-box .footer-text {
+            margin-top: 20px;
+            font-size: 12px;
+            color: #444;
+            letter-spacing: 1px;
+        }
+
+        .login-box .footer-text i {
+            color: #F5A623;
+        }
+
+        /* ===== RESPONSIVO ===== */
+        @media (max-width: 480px) {
+            .login-box {
+                padding: 28px 20px;
+            }
+            .login-box .logo-login {
+                max-width: 140px;
+            }
+            .login-box .brand-name {
+                font-size: 18px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-box">
+            <!-- LOGO -->
+            <img src="https://i.ibb.co/spV0d30d/logomundomaromba.jpg" alt="Mundo Maromba Fit" class="logo-login">
+            
+            <!-- NOME DA LOJA -->
+            <div class="brand-name">MUNDO MAROMBA</div>
+            <div class="brand-sub">SUPLEMENTOS</div>
+            
+            <!-- TÍTULO -->
+            <div class="login-title">
+                <i class="fas fa-lock"></i> Login do Sócio
+            </div>
+            
+            <!-- FORMULÁRIO -->
+            <form id="loginForm">
+                <div class="input-group">
+                    <input type="email" id="email" placeholder="Seu e-mail" required>
+                    <i class="fas fa-envelope"></i>
+                </div>
+                
+                <div class="input-group">
+                    <input type="password" id="password" placeholder="Sua senha" required>
+                    <i class="fas fa-key"></i>
+                </div>
+                
+                <button type="submit" class="btn-login">
+                    <i class="fas fa-sign-in-alt"></i> Entrar
+                </button>
+            </form>
+            
+            <!-- MENSAGEM -->
+            <div id="loginMessage" class="message"></div>
+            
+            <!-- RODAPÉ -->
+            <div class="footer-text">
+                <i class="fas fa-shield-alt"></i> Acesso restrito aos sócios
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="firebase-config.js"></script>
+    <script type="module" src="script.js"></script>
+</body>
+</html>

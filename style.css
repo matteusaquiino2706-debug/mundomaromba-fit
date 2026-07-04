@@ -1,0 +1,1014 @@
+/* ============================================================
+   MUNDO MAROMBA FIT - DESIGN MODERNO
+   ============================================================ */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #0a0a12;
+    min-height: 100vh;
+    color: #fff;
+    background-image: 
+        radial-gradient(ellipse at 10% 20%, rgba(245, 166, 35, 0.05) 0%, transparent 50%),
+        radial-gradient(ellipse at 90% 80%, rgba(230, 126, 34, 0.03) 0%, transparent 50%);
+}
+
+.container {
+    max-width: 1300px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/* ============================================================
+   HEADER MODERNO
+   ============================================================ */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 24px;
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    margin-bottom: 30px;
+    flex-wrap: wrap;
+    gap: 15px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    transition: all 0.3s ease;
+}
+
+.header .logo-area {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.header .logo-area img {
+    height: 52px;
+    width: auto;
+    object-fit: contain;
+    filter: drop-shadow(0 0 20px rgba(245, 166, 35, 0.15));
+}
+
+.header .logo-area .logo-text {
+    font-family: 'Orbitron', 'Inter', sans-serif;
+    font-size: 24px;
+    font-weight: 900;
+    background: linear-gradient(135deg, #F5A623 0%, #E67E22 50%, #F5A623 100%);
+    background-size: 200% 200%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: 1px;
+    animation: gradientMove 4s ease-in-out infinite;
+}
+
+@keyframes gradientMove {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+}
+
+.header .logo-area .logo-sub {
+    font-size: 11px;
+    color: #F5A623;
+    letter-spacing: 3px;
+    font-weight: 600;
+    text-transform: uppercase;
+    opacity: 0.7;
+}
+
+.header .user-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 6px 16px 6px 20px;
+    border-radius: 50px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.header .user-info span {
+    font-size: 13px;
+    color: #ccc;
+    font-weight: 500;
+}
+
+.btn-sair {
+    background: rgba(255, 68, 68, 0.15);
+    border: 1px solid rgba(255, 68, 68, 0.2);
+    padding: 8px 18px;
+    border-radius: 50px;
+    color: #ff6b6b;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: 600;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.btn-sair:hover {
+    background: rgba(255, 68, 68, 0.25);
+    border-color: #ff4444;
+    transform: scale(1.02);
+}
+
+/* ============================================================
+   ABAS MODERNAS
+   ============================================================ */
+.tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 30px;
+    padding: 6px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    flex-wrap: wrap;
+    backdrop-filter: blur(10px);
+}
+
+.tab-btn {
+    background: transparent;
+    border: none;
+    padding: 12px 22px;
+    border-radius: 10px;
+    color: #888;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    letter-spacing: 0.3px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'Inter', sans-serif;
+}
+
+.tab-btn i {
+    font-size: 15px;
+    transition: transform 0.3s ease;
+}
+
+.tab-btn:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.05);
+    transform: translateY(-1px);
+}
+
+.tab-btn:hover i {
+    transform: scale(1.1);
+}
+
+.tab-btn.active {
+    background: linear-gradient(135deg, rgba(245, 166, 35, 0.2), rgba(230, 126, 34, 0.1));
+    color: #F5A623;
+    box-shadow: 0 0 30px rgba(245, 166, 35, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(245, 166, 35, 0.15);
+}
+
+.tab-btn.active i {
+    color: #F5A623;
+}
+
+/* ============================================================
+   CONTEÚDO DAS ABAS (Glassmorphism)
+   ============================================================ */
+.tab-content {
+    display: none;
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 20px;
+    padding: 30px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    animation: fadeSlideIn 0.4s ease;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+@keyframes fadeSlideIn {
+    from { opacity: 0; transform: translateY(15px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.tab-content h2 {
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.tab-content h2 i {
+    color: #F5A623;
+}
+
+.tab-content .subtitle {
+    color: #888;
+    font-size: 14px;
+    margin-bottom: 25px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* ============================================================
+   FORMULÁRIOS MODERNOS
+   ============================================================ */
+.form-row {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+}
+
+.form-group {
+    flex: 1;
+    min-width: 200px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #aaa;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.form-group label i {
+    color: #F5A623;
+    font-size: 13px;
+}
+
+.form-group input,
+.form-group select {
+    width: 100%;
+    padding: 12px 16px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.04);
+    color: #fff;
+    font-size: 14px;
+    transition: all 0.3s ease;
+    font-family: 'Inter', sans-serif;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+    border-color: #F5A623;
+    outline: none;
+    box-shadow: 0 0 0 4px rgba(245, 166, 35, 0.1);
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.form-group input[readonly] {
+    background: rgba(255, 255, 255, 0.02);
+    color: #888;
+    border-color: transparent;
+}
+
+.form-group input::placeholder {
+    color: #555;
+}
+
+/* ============================================================
+   BOTÕES MODERNOS
+   ============================================================ */
+.btn-primary {
+    background: linear-gradient(135deg, #F5A623, #E67E22);
+    color: #fff;
+    border: none;
+    padding: 14px 32px;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    letter-spacing: 0.3px;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-family: 'Inter', sans-serif;
+    box-shadow: 0 4px 20px rgba(245, 166, 35, 0.2);
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px) scale(1.01);
+    box-shadow: 0 8px 35px rgba(245, 166, 35, 0.35);
+}
+
+.btn-primary:active {
+    transform: translateY(0) scale(0.98);
+}
+
+.btn-secondary {
+    background: rgba(255, 255, 255, 0.06);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 10px 20px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-family: 'Inter', sans-serif;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+}
+
+.btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.15);
+    transform: translateY(-1px);
+}
+
+.btn-danger {
+    background: rgba(244, 67, 54, 0.15);
+    color: #f44336;
+    border: 1px solid rgba(244, 67, 54, 0.2);
+    padding: 10px 20px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-family: 'Inter', sans-serif;
+}
+
+.btn-danger:hover {
+    background: rgba(244, 67, 54, 0.25);
+    border-color: #f44336;
+}
+
+/* ============================================================
+   FILTROS
+   ============================================================ */
+.filtros-area {
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+    margin-bottom: 25px;
+    padding: 16px 20px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.filtros-area .filtro-group {
+    flex: 1;
+    min-width: 150px;
+}
+
+.filtros-area .filtro-group label {
+    display: block;
+    font-size: 11px;
+    color: #888;
+    margin-bottom: 4px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.filtros-area .filtro-group select {
+    width: 100%;
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.04);
+    color: #fff;
+    font-size: 13px;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+}
+
+.filtros-area .filtro-group select:focus {
+    border-color: #F5A623;
+    outline: none;
+}
+
+/* ============================================================
+   ESTOQUE (CARDS MODERNOS)
+   ============================================================ */
+.resumo-produto {
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 16px;
+    padding: 20px 24px;
+    margin-bottom: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+}
+
+.resumo-produto:hover {
+    border-color: rgba(245, 166, 35, 0.15);
+    background: rgba(255, 255, 255, 0.06);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+}
+
+.resumo-produto .produto-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.resumo-produto .produto-header .nome {
+    font-size: 17px;
+    font-weight: 700;
+    color: #fff;
+}
+
+.resumo-produto .produto-header .marca {
+    color: #F5A623;
+    font-weight: 700;
+}
+
+.resumo-produto .produto-header .total {
+    font-size: 20px;
+    font-weight: 700;
+    color: #4caf50;
+}
+
+.resumo-produto .lotes-container {
+    margin-top: 12px;
+    padding-left: 15px;
+    border-left: 3px solid rgba(245, 166, 35, 0.2);
+}
+
+.lote-item {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 10px;
+    padding: 10px 14px;
+    margin-bottom: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    transition: all 0.2s ease;
+}
+
+.lote-item:hover {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.lote-item .info {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+.lote-item .info .data {
+    font-size: 12px;
+    color: #666;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.lote-item .info .custo {
+    font-size: 13px;
+    color: #aaa;
+}
+
+.lote-item .info .saldo {
+    font-weight: 700;
+    font-size: 16px;
+    color: #4caf50;
+}
+
+.lote-item .acoes {
+    display: flex;
+    gap: 8px;
+}
+
+.lote-item .acoes button {
+    padding: 4px 12px;
+    border: none;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-family: 'Inter', sans-serif;
+}
+
+.lote-item .acoes .btn-editar {
+    background: #F5A623;
+    color: #fff;
+}
+
+.lote-item .acoes .btn-editar:hover {
+    background: #E67E22;
+    transform: scale(1.05);
+}
+
+/* ============================================================
+   RELATÓRIOS
+   ============================================================ */
+.relatorio-card {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.card {
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 14px;
+    padding: 18px 20px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+}
+
+.card:hover {
+    border-color: rgba(245, 166, 35, 0.15);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+}
+
+.card h3 {
+    font-size: 11px;
+    color: #888;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+}
+
+.card .valor {
+    font-size: 24px;
+    font-weight: 700;
+    color: #4caf50;
+}
+
+.card .valor.vermelho {
+    color: #f44336;
+}
+
+.card .valor.laranja {
+    color: #F5A623;
+}
+
+/* ============================================================
+   ARMAZENAMENTO
+   ============================================================ */
+.upload-area {
+    border: 2px dashed rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    padding: 40px;
+    text-align: center;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    margin-bottom: 25px;
+}
+
+.upload-area:hover {
+    border-color: #F5A623;
+    background: rgba(245, 166, 35, 0.05);
+}
+
+.upload-area.dragover {
+    border-color: #4caf50;
+    background: rgba(76, 175, 80, 0.05);
+}
+
+.upload-area .icon {
+    font-size: 48px;
+    margin-bottom: 10px;
+}
+
+.upload-area h3 {
+    color: #ccc;
+    font-weight: 600;
+}
+
+.upload-area p {
+    color: #888;
+    font-size: 14px;
+}
+
+.pasta-seletor {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.pasta-seletor label {
+    font-weight: 600;
+    color: #ccc;
+}
+
+.pasta-seletor select,
+.pasta-seletor input {
+    padding: 10px 16px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.04);
+    color: #fff;
+    font-size: 14px;
+}
+
+.galeria-imagens {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 15px;
+    margin-top: 20px;
+}
+
+.galeria-imagens .imagem-item {
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 12px;
+    padding: 10px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.galeria-imagens .imagem-item:hover {
+    border-color: #F5A623;
+}
+
+.galeria-imagens .imagem-item img {
+    width: 100%;
+    height: 120px;
+    object-fit: cover;
+    border-radius: 8px;
+}
+
+.galeria-imagens .imagem-item .nome-arquivo {
+    font-size: 11px;
+    color: #888;
+    margin-top: 6px;
+    word-break: break-all;
+}
+
+/* ============================================================
+   NOTIFICAÇÕES (TOAST)
+   ============================================================ */
+.toast-container {
+    position: fixed;
+    top: 24px;
+    right: 24px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-width: 420px;
+    width: 100%;
+}
+
+.toast {
+    padding: 16px 20px;
+    border-radius: 14px;
+    color: #fff;
+    font-weight: 600;
+    font-size: 14px;
+    animation: slideInRight 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.toast.sucesso {
+    background: rgba(76, 175, 80, 0.85);
+    border-color: rgba(76, 175, 80, 0.2);
+}
+
+.toast.erro {
+    background: rgba(244, 67, 54, 0.85);
+    border-color: rgba(244, 67, 54, 0.2);
+}
+
+.toast.aviso {
+    background: rgba(255, 152, 0, 0.85);
+    border-color: rgba(255, 152, 0, 0.2);
+}
+
+.toast.info {
+    background: rgba(33, 150, 243, 0.85);
+    border-color: rgba(33, 150, 243, 0.2);
+}
+
+.toast .toast-icon {
+    font-size: 22px;
+}
+
+.toast .toast-close {
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 20px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    padding: 0 4px;
+}
+
+.toast .toast-close:hover {
+    color: #fff;
+}
+
+@keyframes slideInRight {
+    from { transform: translateX(100%) scale(0.9); opacity: 0; }
+    to { transform: translateX(0) scale(1); opacity: 1; }
+}
+
+@keyframes slideOutRight {
+    from { transform: translateX(0) scale(1); opacity: 1; }
+    to { transform: translateX(100%) scale(0.9); opacity: 0; }
+}
+
+.toast.removendo {
+    animation: slideOutRight 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* ============================================================
+   MENSAGENS
+   ============================================================ */
+.message {
+    margin-top: 15px;
+    padding: 12px 16px;
+    border-radius: 12px;
+    text-align: center;
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.message.sucesso {
+    background: rgba(76, 175, 80, 0.15);
+    border: 1px solid rgba(76, 175, 80, 0.2);
+    color: #4caf50;
+}
+
+.message.erro {
+    background: rgba(244, 67, 54, 0.15);
+    border: 1px solid rgba(244, 67, 54, 0.2);
+    color: #f44336;
+}
+
+/* ============================================================
+   SCROLLBAR PERSONALIZADA
+   ============================================================ */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(245, 166, 35, 0.3);
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(245, 166, 35, 0.5);
+}
+
+/* ============================================================
+   CORREÇÃO PARA DROPDOWNS (SELECTS)
+   ============================================================ */
+
+/* Forçar a cor do texto nos selects */
+select {
+    color: #ffffff !important;
+    background-color: rgba(255, 255, 255, 0.06) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Forçar a cor do texto nas opções */
+select option {
+    color: #ffffff !important;
+    background-color: #1a1a2e !important;
+    padding: 10px 14px !important;
+    font-size: 14px !important;
+}
+
+/* Cor ao passar o mouse sobre as opções */
+select option:hover,
+select option:focus {
+    background-color: #F5A623 !important;
+    color: #ffffff !important;
+}
+
+/* Cor da opção selecionada */
+select option:checked {
+    background-color: #F5A623 !important;
+    color: #ffffff !important;
+}
+
+/* Para o Firefox */
+select option {
+    background: #1a1a2e !important;
+    color: #ffffff !important;
+}
+
+/* Para o Chrome/Edge (quando o select está fechado) */
+select:focus {
+    outline: 2px solid rgba(245, 166, 35, 0.3) !important;
+    outline-offset: 2px;
+}
+
+/* ============================================================
+   ESTOQUE - VITRINE DIGITAL
+   ============================================================ */
+
+.produto-card {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.produto-card .preco-destaque {
+    background: linear-gradient(135deg, #F5A623, #E67E22);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* Container do estoque com scroll suave */
+#estoqueLista {
+    max-height: 800px;
+    overflow-y: auto;
+    padding-right: 8px;
+}
+
+#estoqueLista::-webkit-scrollbar {
+    width: 4px;
+}
+
+#estoqueLista::-webkit-scrollbar-track {
+    background: rgba(255,255,255,0.02);
+    border-radius: 10px;
+}
+
+#estoqueLista::-webkit-scrollbar-thumb {
+    background: rgba(245, 166, 35, 0.3);
+    border-radius: 10px;
+}
+
+/* ============================================================
+   RESPONSIVIDADE - MOBILE OTIMIZADO
+   ============================================================ */
+@media (max-width: 768px) {
+    /* Estilos existentes do container */
+    .container {
+        padding: 12px;
+    }
+    
+    .header {
+        padding: 12px 16px;
+        flex-direction: column;
+        align-items: stretch;
+        text-align: center;
+    }
+    
+    .header .logo-area {
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+    
+    .header .logo-area img {
+        height: 40px;
+    }
+    
+    .header .logo-area .logo-text {
+        font-size: 18px;
+    }
+    
+    .header .user-info {
+        justify-content: center;
+        padding: 6px 12px;
+    }
+    
+    .tabs {
+        flex-direction: column;
+        padding: 4px;
+    }
+    
+    .tab-btn {
+        justify-content: center;
+        padding: 10px 16px;
+        font-size: 12px;
+    }
+    
+    .tab-content {
+        padding: 16px;
+    }
+    
+    .form-row {
+        flex-direction: column;
+        gap: 12px;
+    }
+    
+    .form-group {
+        min-width: 100%;
+    }
+    
+    .relatorio-card {
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+    }
+    
+    .card .valor {
+        font-size: 18px;
+    }
+    
+    .filtros-area {
+        flex-direction: column;
+    }
+    
+    .resumo-produto {
+        padding: 14px 16px;
+    }
+    
+    .galeria-imagens {
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    }
+    
+    .toast-container {
+        top: 12px;
+        right: 12px;
+        max-width: calc(100% - 24px);
+    }
+
+    /* Ajustes para o modo interno no mobile */
+    .modo-interno-card {
+        padding: 12px !important;
+    }
+
+    .modo-interno-card .lote-linha {
+        grid-template-columns: 1fr 0.5fr 0.8fr 0.8fr 0.8fr !important;
+        font-size: 9px !important;
+        gap: 3px !important;
+    }
+
+    .modo-interno-card .resumo-grid {
+        grid-template-columns: 1fr 1fr !important;
+        gap: 6px !important;
+    }
+
+    /* Grid de produtos no mobile */
+    .produtos-grid {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)) !important;
+        gap: 10px !important;
+    }
+
+    /* Ajuste do botão toggle */
+    #toggleModoEstoque {
+        font-size: 11px !important;
+        padding: 4px 10px !important;
+    }
+}
+
+/* ============================================================
+   CORREÇÃO DROPDOWNS - FORÇA BRUTA
+   ============================================================ */
+select option {
+    color: #fff !important;
+    background: #1a1a2e !important;
+    padding: 8px 12px !important;
+    font-size: 14px !important;
+}
+
+select {
+    color: #fff !important;
+    background: rgba(255, 255, 255, 0.05) !important;
+}
+
+select option:hover,
+select option:focus,
+select option:checked {
+    background: #F5A623 !important;
+    color: #fff !important;
+}
