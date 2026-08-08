@@ -8,6 +8,8 @@ let precoSugeridoAtualVenda = null;
 let bloqueandoAtualizacaoDesconto = false;
 let produtosCompraCache = {};
 let produtosVendaCache = [];
+const MARGEM_PADRAO_COMPRA = 0.4;
+let valorSugeridoAutomaticoCompra = '';
 
 // ============================================================
 // TABELA DE TAXAS DA MAQUINETA
@@ -215,11 +217,13 @@ function atualizarPreviewImagemProduto() {
 }
 
 function montarConsultaImagemProduto() {
+    const sabor = document.getElementById('sabor')?.value;
+
     return [
         document.getElementById('marca')?.value,
         document.getElementById('nome')?.value,
         document.getElementById('peso')?.value,
-        document.getElementById('sabor')?.value,
+        normalizarComparacao(sabor) === 'sem sabor' ? '' : sabor,
         'suplemento embalagem'
     ].filter(Boolean).join(' ').trim();
 }
@@ -290,8 +294,8 @@ async function buscarImagemProdutoOnline() {
         definirStatusBuscaImagem('Escolha uma das imagens encontradas.', 'sucesso');
     } catch (error) {
         console.warn('Busca online de imagem indisponível:', error);
-        definirStatusBuscaImagem('Busca automática precisa de uma API conectada no Netlify.', 'aviso');
-        mostrarNotificacao('Para buscar imagens automaticamente, precisamos conectar uma API de busca no Netlify.', 'aviso');
+        definirStatusBuscaImagem('Busca automática indisponível agora. Tente novamente em instantes.', 'aviso');
+        mostrarNotificacao('Não foi possível buscar imagens online agora.', 'aviso');
     }
 }
 
@@ -414,6 +418,7 @@ document.addEventListener('DOMContentLoaded', function() {
         carregarRelatorio();
         definirDataDespesaPadrao();
         definirDataCompraPadrao();
+        definirSaborCompraPadrao();
         definirDataCaixaPadrao();
         atualizarResumoCompra();
         atualizarPreviewImagemProduto();
@@ -583,6 +588,7 @@ function mudarAba(abaId) {
     if (abaId === 'estoque') carregarEstoqueLotes();
     if (abaId === 'compras') {
         definirDataCompraPadrao();
+        definirSaborCompraPadrao();
         carregarProdutosCompraRapida();
         atualizarResumoCompra();
         atualizarPreviewImagemProduto();
@@ -611,9 +617,35 @@ function definirDataCompraPadrao() {
     }
 }
 
+function definirSaborCompraPadrao() {
+    const sabor = document.getElementById('sabor');
+    if (sabor && !sabor.value.trim()) {
+        sabor.value = 'Sem sabor';
+    }
+}
+
+function formatarValorCampo(valor) {
+    return converterNumero(valor).toFixed(2).replace('.', ',');
+}
+
 function atualizarTexto(id, texto) {
     const elemento = document.getElementById(id);
     if (elemento) elemento.textContent = texto;
+}
+
+function aplicarSugestaoAutomaticaCompra(custoUnitario) {
+    const campo = document.getElementById('valorSugerido');
+    if (!campo) return;
+
+    const sugestao = custoUnitario > 0 ? formatarValorCampo(custoUnitario * (1 + MARGEM_PADRAO_COMPRA)) : '';
+    const valorAtual = campo.value.trim();
+    const podeAtualizar = !valorAtual || valorAtual === valorSugeridoAutomaticoCompra;
+
+    if (podeAtualizar) {
+        campo.value = sugestao;
+    }
+
+    valorSugeridoAutomaticoCompra = sugestao;
 }
 
 function calcularUnitario() {
@@ -622,11 +654,13 @@ function calcularUnitario() {
 
     if (valorTotal > 0 && quantidade > 0) {
         const unitario = valorTotal / quantidade;
-        document.getElementById('valorUnitario').value = unitario.toFixed(2).replace('.', ',');
-        document.getElementById('simulacao40').value = (unitario * 1.4).toFixed(2).replace('.', ',');
+        document.getElementById('valorUnitario').value = formatarValorCampo(unitario);
+        document.getElementById('simulacao40').value = formatarValorCampo(unitario * (1 + MARGEM_PADRAO_COMPRA));
+        aplicarSugestaoAutomaticaCompra(unitario);
     } else {
         document.getElementById('valorUnitario').value = '';
         document.getElementById('simulacao40').value = '';
+        aplicarSugestaoAutomaticaCompra(0);
     }
 
     atualizarResumoCompra();
@@ -637,7 +671,7 @@ function atualizarResumoCompra() {
     const quantidade = parseInt(document.getElementById('quantidadeCompra')?.value) || 0;
     const custoUnitario = quantidade > 0 ? valorTotal / quantidade : 0;
     const vendaSugeridaInformada = converterNumero(document.getElementById('valorSugerido')?.value);
-    const vendaSugerida = vendaSugeridaInformada || (custoUnitario > 0 ? custoUnitario * 1.4 : 0);
+    const vendaSugerida = vendaSugeridaInformada || (custoUnitario > 0 ? custoUnitario * (1 + MARGEM_PADRAO_COMPRA) : 0);
     const lucroUnitario = Math.max(0, vendaSugerida - custoUnitario);
     const margem = vendaSugerida > 0 ? (lucroUnitario / vendaSugerida) * 100 : 0;
     const potencial = lucroUnitario * quantidade;
@@ -721,8 +755,9 @@ function preencherCompraPorProdutoExistente() {
     document.getElementById('familia').value = produto.familia || 'Outros';
     document.getElementById('nome').value = produto.produto || '';
     document.getElementById('peso').value = produto.peso || '';
-    document.getElementById('sabor').value = produto.sabor === 'Sem sabor' ? '' : (produto.sabor || '');
+    document.getElementById('sabor').value = produto.sabor || 'Sem sabor';
     document.getElementById('valorSugerido').value = produto.valorSugerido ? produto.valorSugerido.toFixed(2).replace('.', ',') : '';
+    valorSugeridoAutomaticoCompra = '';
     document.getElementById('imagemProduto').value = produto.imagemUrl || '';
 
     atualizarResumoCompra();
@@ -739,7 +774,7 @@ async function registrarCompra(event) {
         const valorTotalCompra = converterNumero(document.getElementById('valorTotal').value);
         const custoUnitario = quantidadeCompra > 0 ? valorTotalCompra / quantidadeCompra : 0;
         const valorSugeridoInformado = converterNumero(document.getElementById('valorSugerido').value) || null;
-        const simulacao40 = custoUnitario * 1.4;
+        const simulacao40 = custoUnitario * (1 + MARGEM_PADRAO_COMPRA);
         const imagemUrl = document.getElementById('imagemProduto')?.value.trim() || '';
 
         const lote = {
@@ -774,7 +809,9 @@ async function registrarCompra(event) {
 
         mostrarNotificacao(`Lote registrado! ${lote.quantidade} un. a R$ ${lote.custoUnitario.toFixed(2)}`, 'sucesso');
         document.getElementById('compraForm').reset();
+        valorSugeridoAutomaticoCompra = '';
         definirDataCompraPadrao();
+        definirSaborCompraPadrao();
         atualizarResumoCompra();
         atualizarPreviewImagemProduto();
 
