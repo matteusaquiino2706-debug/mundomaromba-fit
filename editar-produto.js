@@ -5,6 +5,7 @@
 const urlParams = new URLSearchParams(window.location.search);
 const loteId = urlParams.get('id');
 let loteAtual = null;
+let currentUser = null;
 
 document.addEventListener('DOMContentLoaded', async function() {
     if (!loteId) {
@@ -13,7 +14,22 @@ document.addEventListener('DOMContentLoaded', async function() {
         return;
     }
     
-    await carregarLote();
+    window.onAuthStateChanged(window.auth, async (user) => {
+        if (!user) {
+            window.location.href = 'index.html';
+            return;
+        }
+
+        currentUser = user;
+        window.currentUser = user;
+        configurarEventos();
+        await carregarLote();
+    });
+});
+
+function configurarEventos() {
+    if (window.eventosEditarProdutoConfigurados) return;
+    window.eventosEditarProdutoConfigurados = true;
     
     document.getElementById('editarForm').addEventListener('submit', salvarAlteracoes);
     document.getElementById('voltarBtn').addEventListener('click', () => {
@@ -30,7 +46,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         const custo = parseFloat(this.value) || 0;
         document.getElementById('simulacao40').value = (custo * 1.4).toFixed(2);
     });
-});
+}
 
 function previewImagem(url) {
     const container = document.getElementById('previewContainer');
@@ -149,28 +165,43 @@ async function cancelarLote() {
     if (!confirmar) return;
     
     try {
-        const novoSaldo = saldo - quantidadeCancelar;
-        const novaQuantidadeTotal = loteAtual.quantidade - quantidadeCancelar;
-        
         const docRef = window.doc(window.db, 'lotes', loteId);
-        await window.updateDoc(docRef, {
-            quantidade: novaQuantidadeTotal,
-            ativo: novoSaldo > 0
+        await window.runTransaction(window.db, async (transaction) => {
+            const docSnap = await transaction.get(docRef);
+            if (!docSnap.exists()) {
+                throw new Error('Lote não encontrado.');
+            }
+
+            const lote = docSnap.data();
+            const saldoAtual = (lote.quantidade || 0) - (lote.vendido || 0);
+            if (quantidadeCancelar > saldoAtual) {
+                throw new Error(`Saldo insuficiente! Disponível agora: ${saldoAtual} unidades.`);
+            }
+
+            const novoSaldo = saldoAtual - quantidadeCancelar;
+            const novaQuantidadeTotal = (lote.quantidade || 0) - quantidadeCancelar;
+
+            transaction.update(docRef, {
+                quantidade: novaQuantidadeTotal,
+                ativo: novoSaldo > 0
+            });
+
+            const cancelamentoRef = window.doc(window.collection(window.db, 'cancelamentos'));
+            transaction.set(cancelamentoRef, {
+                loteId: loteId,
+                produto: lote.produto,
+                marca: lote.marca,
+                sabor: lote.sabor || '',
+                peso: lote.peso || '',
+                quantidade: quantidadeCancelar,
+                valorUnitario: lote.custoUnitario,
+                valorTotal: lote.custoUnitario * quantidadeCancelar,
+                motivo: motivo,
+                data: new Date().toISOString(),
+                tipo: 'cancelamento_lote',
+                registradoPor: currentUser?.email || 'desconhecido'
+            });
         });
-        
-        const cancelamento = {
-            loteId: loteId,
-            produto: loteAtual.produto,
-            marca: loteAtual.marca,
-            quantidade: quantidadeCancelar,
-            valorUnitario: loteAtual.custoUnitario,
-            valorTotal: loteAtual.custoUnitario * quantidadeCancelar,
-            motivo: motivo,
-            data: new Date().toISOString(),
-            tipo: 'cancelamento_lote'
-        };
-        
-        await window.addDoc(window.collection(window.db, 'cancelamentos'), cancelamento);
         
         document.getElementById('message').innerHTML = `✅ Cancelamento registrado! ${quantidadeCancelar} unidade(s) removidas.`;
         document.getElementById('message').className = 'message sucesso';
@@ -187,6 +218,13 @@ async function cancelarLote() {
 
 async function excluirLote() {
     const saldo = loteAtual.quantidade - loteAtual.vendido;
+
+    if ((loteAtual.vendido || 0) > 0) {
+        document.getElementById('message').innerHTML = '❌ Este lote já possui vendas registradas. Para manter o histórico correto, cancele apenas o saldo restante em vez de excluir o lote.';
+        document.getElementById('message').className = 'message erro';
+        return;
+    }
+
     const confirmar = confirm(`🚨 PERIGO! Excluir PERMANENTEMENTE o lote:\n\n${loteAtual.marca} - ${loteAtual.produto}\nData: ${loteAtual.dataCompra}\nSaldo: ${saldo} unidades\n\nDigite "EXCLUIR" para confirmar:`);
     
     if (!confirmar) return;

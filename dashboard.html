@@ -375,7 +375,8 @@
             letter-spacing: 0.5px;
         }
 
-        .filtros-area .filtro-group select {
+        .filtros-area .filtro-group select,
+        .filtros-area .filtro-group input {
             width: 100%;
             padding: 8px 12px;
             border-radius: 8px;
@@ -383,8 +384,11 @@
             background: rgba(255,255,255,0.04);
             color: #fff;
             font-size: 13px;
-            cursor: pointer;
             font-family: 'Inter', sans-serif;
+        }
+
+        .filtros-area .filtro-group select {
+            cursor: pointer;
         }
 
         /* ===== INFO PRODUTO ===== */
@@ -416,6 +420,404 @@
             font-size: 16px;
             font-weight: 700;
             color: #F5A623;
+        }
+
+        /* ===== PAINÉIS DE APOIO ===== */
+        .assist-panel {
+            background: rgba(255,255,255,0.035);
+            border: 1px solid rgba(245, 166, 35, 0.08);
+            border-radius: 10px;
+            padding: 14px 16px;
+            margin-bottom: 16px;
+        }
+
+        .assist-panel-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .assist-panel-header h3 {
+            font-size: 14px;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .assist-panel-header h3 i {
+            color: #F5A623;
+        }
+
+        .metric-pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 30px;
+            padding: 6px 10px;
+            border-radius: 8px;
+            border: 1px solid rgba(245, 166, 35, 0.14);
+            background: rgba(245, 166, 35, 0.08);
+            color: #F5A623;
+            font-size: 12px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .discount-row {
+            margin-bottom: 10px;
+        }
+
+        .discount-history {
+            display: grid;
+            gap: 8px;
+            color: #aaa;
+            font-size: 12px;
+        }
+
+        .history-summary,
+        .expense-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            gap: 8px;
+        }
+
+        .mini-stat {
+            background: rgba(255,255,255,0.035);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 8px;
+            padding: 10px;
+        }
+
+        .mini-stat label {
+            display: block;
+            color: #777;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+
+        .mini-stat strong {
+            color: #F5A623;
+            font-size: 15px;
+        }
+
+        .compact-list {
+            display: grid;
+            gap: 10px;
+            margin-top: 16px;
+        }
+
+        .compact-item {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 12px 14px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-left: 3px solid rgba(245, 166, 35, 0.55);
+            border-radius: 8px;
+        }
+
+        .compact-item strong {
+            color: #fff;
+            font-size: 14px;
+        }
+
+        .compact-item .meta {
+            color: #888;
+            font-size: 12px;
+            margin-top: 3px;
+        }
+
+        .compact-item .valor {
+            color: #F5A623;
+            font-weight: 800;
+            white-space: nowrap;
+            text-align: right;
+        }
+
+        .compact-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .btn-danger {
+            background: rgba(244, 67, 54, 0.12);
+            color: #ff6b6b;
+            border: 1px solid rgba(244, 67, 54, 0.18);
+            padding: 7px 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: 'Inter', sans-serif;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .btn-danger:hover {
+            background: rgba(244, 67, 54, 0.22);
+        }
+
+        .purchase-shell,
+        .sale-shell {
+            display: block;
+        }
+
+        .purchase-panel,
+        .sale-panel {
+            background: rgba(255,255,255,0.025);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 10px;
+            padding: 16px;
+        }
+
+        .purchase-flow,
+        .sale-flow {
+            display: grid;
+            gap: 14px;
+        }
+
+        .cash-layout {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(320px, 0.9fr);
+            gap: 16px;
+            align-items: start;
+        }
+
+        .form-section {
+            padding: 14px;
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 10px;
+            background: rgba(0,0,0,0.12);
+        }
+
+        .form-section-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+            color: #fff;
+            font-size: 14px;
+            font-weight: 800;
+        }
+
+        .form-section-title i {
+            color: #F5A623;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 10px;
+        }
+
+        .summary-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            min-height: 44px;
+            padding: 10px 12px;
+            background: rgba(0,0,0,0.18);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 8px;
+        }
+
+        .summary-item span {
+            color: #888;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .summary-item strong {
+            color: #F5A623;
+            font-size: 15px;
+            text-align: right;
+        }
+
+        .summary-item input {
+            max-width: 145px;
+            margin-left: auto;
+            text-align: right;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.08);
+            background: rgba(255,255,255,0.04);
+            color: #4caf50;
+            font-weight: 800;
+            padding: 9px 10px;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .summary-item input.vermelho {
+            color: #f44336;
+        }
+
+        .quick-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .quick-btn,
+        .qty-btn {
+            min-height: 42px;
+            border-radius: 9px;
+            border: 1px solid rgba(255,255,255,0.08);
+            background: rgba(255,255,255,0.045);
+            color: #ddd;
+            cursor: pointer;
+            font-family: 'Inter', sans-serif;
+            font-size: 12px;
+            font-weight: 800;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 7px;
+        }
+
+        .quick-btn:hover,
+        .qty-btn:hover,
+        .quick-btn.active {
+            border-color: rgba(245,166,35,0.28);
+            background: rgba(245,166,35,0.12);
+            color: #F5A623;
+        }
+
+        .qty-control {
+            display: grid;
+            grid-template-columns: 44px minmax(0, 1fr) 44px;
+            gap: 8px;
+        }
+
+        .qty-control input {
+            text-align: center;
+            font-weight: 800;
+        }
+
+        .sale-submit {
+            width: 100%;
+            justify-content: center;
+            margin-top: 14px;
+        }
+
+        .image-picker {
+            display: grid;
+            grid-template-columns: 120px minmax(0, 1fr);
+            gap: 14px;
+            align-items: stretch;
+        }
+
+        .image-preview {
+            min-height: 120px;
+            border-radius: 10px;
+            border: 1px dashed rgba(245,166,35,0.22);
+            background: rgba(245,166,35,0.05);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .image-preview img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            padding: 8px;
+        }
+
+        .image-preview .fallback-visual,
+        .product-fallback {
+            width: 100%;
+            height: 100%;
+            min-height: 100px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            text-align: center;
+            padding: 12px;
+            background: linear-gradient(135deg, rgba(245,166,35,0.12), rgba(255,255,255,0.03));
+            color: #F5A623;
+        }
+
+        .fallback-visual .initials,
+        .product-fallback .initials {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 26px;
+            font-weight: 900;
+        }
+
+        .fallback-visual .fallback-text,
+        .product-fallback .fallback-text {
+            color: #ddd;
+            font-size: 11px;
+            font-weight: 800;
+            line-height: 1.2;
+        }
+
+        .image-actions {
+            display: grid;
+            gap: 10px;
+        }
+
+        .image-search-status {
+            color: #888;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        .image-results {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(86px, 1fr));
+            gap: 8px;
+        }
+
+        .image-result {
+            border: 1px solid rgba(255,255,255,0.08);
+            background: rgba(255,255,255,0.04);
+            border-radius: 8px;
+            min-height: 86px;
+            overflow: hidden;
+            cursor: pointer;
+        }
+
+        .image-result img {
+            width: 100%;
+            height: 86px;
+            object-fit: contain;
+            padding: 6px;
+        }
+
+        .checkbox-line {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-height: 46px;
+            padding: 10px 12px;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.08);
+            background: rgba(255,255,255,0.04);
+            color: #ddd;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .checkbox-line input {
+            width: 18px;
+            height: 18px;
+            accent-color: #F5A623;
+            flex-shrink: 0;
         }
 
         /* ===== MENSAGENS ===== */
@@ -545,6 +947,80 @@
                 min-width: 100%;
             }
 
+            .image-picker {
+                grid-template-columns: 1fr;
+            }
+
+            .cash-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .form-section {
+                padding: 12px;
+            }
+
+            .summary-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .quick-row {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .summary-item {
+                align-items: stretch;
+                flex-direction: column;
+            }
+
+            .summary-item input {
+                max-width: none;
+                width: 100%;
+                margin-left: 0;
+            }
+
+            .form-group input,
+            .form-group select,
+            .btn-primary,
+            .btn-secondary {
+                min-height: 46px;
+                font-size: 16px;
+            }
+
+            .btn-primary,
+            .btn-secondary {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .assist-panel {
+                padding: 12px;
+            }
+
+            .assist-panel-header {
+                align-items: stretch;
+                flex-direction: column;
+            }
+
+            .metric-pill {
+                width: 100%;
+            }
+
+            .compact-item {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .compact-item .valor,
+            .compact-actions {
+                justify-content: flex-start;
+                text-align: left;
+            }
+
+            .compact-actions .btn-danger,
+            .compact-actions .btn-secondary {
+                flex: 1;
+            }
+
             .filtros-area {
                 flex-direction: column;
                 gap: 8px;
@@ -621,6 +1097,14 @@
                 <i class="fas fa-chart-bar"></i>
                 <span>Relatórios</span>
             </button>
+            <button class="nav-btn" data-tab="caixa">
+                <i class="fas fa-wallet"></i>
+                <span>Caixa</span>
+            </button>
+            <button class="nav-btn" data-tab="despesas">
+                <i class="fas fa-receipt"></i>
+                <span>Despesas</span>
+            </button>
             <button class="nav-btn" data-tab="perdas">
                 <i class="fas fa-trash-alt"></i>
                 <span>Perdas</span>
@@ -657,113 +1141,181 @@
                 <p class="subtitle"><i class="fas fa-info-circle"></i> O sistema vende automaticamente os lotes mais antigos primeiro (FIFO).</p>
             </div>
 
-            <form id="vendaForm">
-                <div class="form-row">
-                    <div class="form-group">
-                        <label><i class="fas fa-box"></i> Produto:</label>
-                        <select id="produtoVenda" required>
-                            <option value="">Selecione um produto</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label><i class="fas fa-hashtag"></i> Quantidade:</label>
-                        <input type="number" id="quantidadeVenda" min="1" required>
-                    </div>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label><i class="fas fa-tag"></i> Preço unitário vendido (R$):</label>
-                        <input type="number" id="precoVenda" step="0.01" required>
-                    </div>
-                    <div class="form-group">
-                        <label><i class="fas fa-credit-card"></i> Pagamento:</label>
-                        <select id="pagamentoVenda">
-                            <option value="Pix">Pix</option>
-                            <option value="Dinheiro">Dinheiro</option>
-                            <option value="Débito">Débito</option>
-                            <option value="Crédito">Crédito</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- INFO PRODUTO -->
-                <div id="infoProduto" class="info-produto" style="display:none;">
-                    <div class="info-grid">
-                        <div>
-                            <label><i class="fas fa-coins"></i> Custo unitário:</label>
-                            <span id="custoExibicao">R$ 0,00</span>
+            <form id="vendaForm" class="sale-shell">
+                <div class="sale-panel sale-flow">
+                    <div class="form-section">
+                        <div class="form-section-title"><i class="fas fa-box"></i> Produto e quantidade</div>
+                        <div class="form-row">
+                            <div class="form-group" style="flex:2;">
+                                <label><i class="fas fa-search"></i> Buscar produto:</label>
+                                <input type="text" id="buscaProdutoVenda" autocomplete="off" placeholder="Digite produto, marca, sabor ou peso">
+                            </div>
+                            <div class="form-group">
+                                <label><i class="fas fa-hashtag"></i> Quantidade:</label>
+                                <div class="qty-control">
+                                    <button type="button" class="qty-btn" data-qty-step="-1"><i class="fas fa-minus"></i></button>
+                                    <input type="number" id="quantidadeVenda" min="1" value="1" required>
+                                    <button type="button" class="qty-btn" data-qty-step="1"><i class="fas fa-plus"></i></button>
+                                </div>
+                            </div>
                         </div>
-                        <div>
-                            <label><i class="fas fa-tag"></i> Preço sugerido:</label>
-                            <span id="sugeridoExibicao">R$ 0,00</span>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label><i class="fas fa-box-open"></i> Produto:</label>
+                                <select id="produtoVenda" required>
+                                    <option value="">Selecione um produto</option>
+                                </select>
+                            </div>
                         </div>
-                        <div>
-                            <label><i class="fas fa-chart-line"></i> Margem bruta:</label>
-                            <span id="margemExibicao">0%</span>
+                        <div class="quick-row">
+                            <button type="button" class="quick-btn" data-qty-preset="1">1 un.</button>
+                            <button type="button" class="quick-btn" data-qty-preset="2">2 un.</button>
+                            <button type="button" class="quick-btn" data-qty-preset="3">3 un.</button>
+                            <button type="button" class="quick-btn" data-qty-preset="5">5 un.</button>
+                        </div>
+
+                        <div id="infoProduto" class="info-produto" style="display:none;">
+                            <div class="info-grid">
+                                <div>
+                                    <label><i class="fas fa-boxes-stacked"></i> Disponível:</label>
+                                    <span id="estoqueExibicao">0 un.</span>
+                                </div>
+                                <div>
+                                    <label><i class="fas fa-coins"></i> Custo unitário:</label>
+                                    <span id="custoExibicao">R$ 0,00</span>
+                                </div>
+                                <div>
+                                    <label><i class="fas fa-tag"></i> Preço sugerido:</label>
+                                    <span id="sugeridoExibicao">R$ 0,00</span>
+                                </div>
+                                <div>
+                                    <label><i class="fas fa-chart-line"></i> Margem bruta:</label>
+                                    <span id="margemExibicao">0%</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                <!-- PARCELAS -->
-                <div class="form-row" id="parcelasRow" style="display:none;">
-                    <div class="form-group">
-                        <label><i class="fas fa-split"></i> Número de parcelas:</label>
-                        <select id="parcelasVenda">
-                            <option value="1">1x</option>
-                            <option value="2">2x</option>
-                            <option value="3">3x</option>
-                            <option value="4">4x</option>
-                            <option value="5">5x</option>
-                            <option value="6">6x</option>
-                            <option value="7">7x</option>
-                            <option value="8">8x</option>
-                            <option value="9">9x</option>
-                            <option value="10">10x</option>
-                            <option value="11">11x</option>
-                            <option value="12">12x</option>
-                            <option value="13">13x</option>
-                            <option value="14">14x</option>
-                            <option value="15">15x</option>
-                            <option value="16">16x</option>
-                            <option value="17">17x</option>
-                            <option value="18">18x</option>
-                        </select>
+                    <div class="form-section">
+                        <div class="form-section-title"><i class="fas fa-cash-register"></i> Preço e pagamento</div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label><i class="fas fa-tag"></i> Preço unitário vendido (R$):</label>
+                                <input type="text" id="precoVenda" inputmode="decimal" autocomplete="off" placeholder="0,00" required>
+                            </div>
+                            <div class="form-group">
+                                <label><i class="fas fa-credit-card"></i> Pagamento:</label>
+                                <select id="pagamentoVenda">
+                                    <option value="Pix">Pix</option>
+                                    <option value="Dinheiro">Dinheiro</option>
+                                    <option value="Débito">Débito</option>
+                                    <option value="Crédito">Crédito</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="quick-row">
+                            <button type="button" class="quick-btn payment-option active" data-pagamento-rapido="Pix"><i class="fas fa-qrcode"></i> Pix</button>
+                            <button type="button" class="quick-btn payment-option" data-pagamento-rapido="Dinheiro"><i class="fas fa-money-bill-wave"></i> Dinheiro</button>
+                            <button type="button" class="quick-btn payment-option" data-pagamento-rapido="Débito"><i class="fas fa-credit-card"></i> Débito</button>
+                            <button type="button" class="quick-btn payment-option" data-pagamento-rapido="Crédito"><i class="fas fa-credit-card"></i> Crédito</button>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label><i class="fas fa-percent"></i> Taxa da maquineta:</label>
-                        <input type="text" id="taxaDisplay" readonly value="0%">
+
+                    <div id="descontoArea" class="form-section" style="display:none;">
+                        <div class="assist-panel-header">
+                            <h3><i class="fas fa-percent"></i> Descontos e últimos preços</h3>
+                            <span id="descontoResumo" class="metric-pill">Sem desconto</span>
+                        </div>
+                        <div class="form-row discount-row">
+                            <div class="form-group">
+                                <label><i class="fas fa-tag"></i> Desconto unitário (R$):</label>
+                                <input type="text" id="descontoValor" inputmode="decimal" autocomplete="off" placeholder="0,00">
+                            </div>
+                            <div class="form-group">
+                                <label><i class="fas fa-percent"></i> Desconto (%):</label>
+                                <input type="text" id="descontoPercentual" inputmode="decimal" autocomplete="off" placeholder="0">
+                            </div>
+                        </div>
+                        <div id="historicoDescontos" class="discount-history"></div>
+                    </div>
+
+                    <div class="form-section" id="parcelasRow" style="display:none;">
+                        <div class="form-section-title"><i class="fas fa-split"></i> Crédito</div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label><i class="fas fa-split"></i> Número de parcelas:</label>
+                                <select id="parcelasVenda">
+                                    <option value="1">1x à vista</option>
+                                    <option value="2">2x</option>
+                                    <option value="3">3x</option>
+                                    <option value="4">4x</option>
+                                    <option value="5">5x</option>
+                                    <option value="6">6x</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label><i class="fas fa-percent"></i> Taxa da maquineta:</label>
+                                <input type="text" id="taxaDisplay" readonly value="0%">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-section" id="repasseRow" style="display:none;">
+                        <div class="form-section-title"><i class="fas fa-hand-holding-dollar"></i> Repasse de juros</div>
+                        <label class="checkbox-line">
+                            <input type="checkbox" id="repasseJuros">
+                            <span>Mostrar total com juros repassados</span>
+                        </label>
+                    </div>
+
+                    <div class="form-section">
+                        <div class="form-section-title"><i class="fas fa-user"></i> Cliente</div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label><i class="fas fa-user"></i> Cliente:</label>
+                                <input type="text" id="clienteVenda" placeholder="Nome do cliente">
+                            </div>
+                            <div class="form-group">
+                                <label><i class="fas fa-phone"></i> Contato (telefone):</label>
+                                <input type="text" id="contatoVenda" placeholder="(11) 99999-9999">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <div class="assist-panel-header">
+                            <h3><i class="fas fa-clipboard-check"></i> Resumo da venda</h3>
+                            <span id="vendaStatusResumo" class="metric-pill">Pronta para venda</span>
+                        </div>
+                        <div class="summary-grid">
+                            <div class="summary-item">
+                                <span>Preço unitário</span>
+                                <strong id="resumoVendaUnitario">R$ 0,00</strong>
+                            </div>
+                            <div class="summary-item">
+                                <span>Desconto</span>
+                                <strong id="resumoVendaDesconto">Sem desconto</strong>
+                            </div>
+                            <div class="summary-item">
+                                <span>Taxa</span>
+                                <strong id="resumoVendaTaxa">R$ 0,00</strong>
+                            </div>
+                            <div class="summary-item">
+                                <span>Total a cobrar</span>
+                                <input type="text" id="previewTotal" inputmode="decimal" autocomplete="off" value="0">
+                            </div>
+                            <div class="summary-item">
+                                <span>Valor líquido</span>
+                                <input type="text" id="previewLiquido" readonly value="R$ 0,00">
+                            </div>
+                            <div class="summary-item">
+                                <span>Lucro estimado</span>
+                                <input type="text" id="previewLucro" readonly value="R$ 0,00">
+                            </div>
+                        </div>
+                        <button type="submit" class="btn-primary sale-submit"><i class="fas fa-check"></i> Registrar Venda</button>
                     </div>
                 </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label><i class="fas fa-user"></i> Cliente:</label>
-                        <input type="text" id="clienteVenda" placeholder="Nome do cliente">
-                    </div>
-                    <div class="form-group">
-                        <label><i class="fas fa-phone"></i> Contato (telefone):</label>
-                        <input type="text" id="contatoVenda" placeholder="(11) 99999-9999">
-                    </div>
-                </div>
-
-                <!-- PREVIEW -->
-                <div class="form-row" style="background: rgba(245,166,35,0.05); padding:12px 16px; border-radius:10px; margin-top:8px; border:1px solid rgba(245,166,35,0.08);">
-                    <div class="form-group">
-                        <label style="color:#4caf50;"><i class="fas fa-money-bill-wave"></i> Valor total:</label>
-                        <input type="number" id="previewTotal" step="0.01" value="0" style="color:#4caf50; font-weight:bold; font-size:15px;">
-                    </div>
-                    <div class="form-group">
-                        <label style="color:#F5A623;"><i class="fas fa-calculator"></i> Valor líquido (com taxa):</label>
-                        <input type="text" id="previewLiquido" readonly value="R$ 0,00">
-                    </div>
-                    <div class="form-group">
-                        <label style="color:#4caf50;"><i class="fas fa-coins"></i> Lucro real estimado:</label>
-                        <input type="text" id="previewLucro" readonly value="R$ 0,00">
-                    </div>
-                </div>
-
-                <button type="submit" class="btn-primary"><i class="fas fa-check"></i> Registrar Venda</button>
             </form>
             <div id="vendaMessage" class="message"></div>
         </section>
@@ -775,104 +1327,132 @@
                 <p class="subtitle"><i class="fas fa-box"></i> Cada compra cria um novo LOTE no estoque com seu próprio preço de custo.</p>
             </div>
 
-            <form id="compraForm">
-                <div class="form-row">
-                    <div class="form-group">
-                        <label><i class="far fa-calendar-alt"></i> Data da compra:</label>
-                        <input type="date" id="dataCompra" required>
+            <form id="compraForm" class="purchase-shell">
+                <div class="purchase-panel purchase-flow">
+                    <div class="form-section">
+                        <div class="form-section-title"><i class="far fa-calendar-alt"></i> Compra</div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label><i class="far fa-calendar-alt"></i> Data:</label>
+                                <input type="date" id="dataCompra" required>
+                            </div>
+                        </div>
                     </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label><i class="fas fa-tag"></i> Marca:</label>
-                        <input type="text" id="marca" required>
-                    </div>
-                    <div class="form-group">
-                        <label><i class="fas fa-layer-group"></i> Família:</label>
-                        <select id="familia" required>
-                            <option value="">Selecione...</option>
-                            <option value="Pre Treino">Pré Treino</option>
-                            <option value="Creatina">Creatina</option>
-                            <option value="Whey">Whey</option>
-                            <option value="Termogenico">Termogênico</option>
-                            <option value="Hipercalorico">Hipercalórico</option>
-                            <option value="BCAA">BCAA</option>
-                            <option value="Diuretico">Diurético</option>
-                            <option value="Barra Cereal">Barra Cereal</option>
-                            <option value="Outros">Outros</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label><i class="fas fa-box"></i> Nome do produto:</label>
-                        <input type="text" id="nome" required>
-                    </div>
-                    <div class="form-group">
-                        <label><i class="fas fa-weight-hanging"></i> Peso/Volume:</label>
-                        <input type="text" id="peso" required>
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label><i class="fas fa-utensils"></i> Sabor:</label>
-                        <input type="text" id="sabor" placeholder="Ex: Morango, Sem sabor">
-                    </div>
-                    <div class="form-group">
-                        <label><i class="fas fa-hashtag"></i> Quantidade comprada:</label>
-                        <input type="number" id="quantidadeCompra" min="1" required>
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label><i class="fas fa-money-bill-wave"></i> Valor total pago (R$):</label>
-                        <input type="number" id="valorTotal" step="0.01" required>
-                    </div>
-                    <div class="form-group">
-                        <label><i class="fas fa-calculator"></i> Valor unitário (calculado):</label>
-                        <input type="text" id="valorUnitario" readonly>
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label><i class="fas fa-chart-line"></i> Simulação 40% (R$):</label>
-                        <input type="text" id="simulacao40" readonly>
-                    </div>
-                    <div class="form-group">
-                        <label><i class="fas fa-tag"></i> Valor sugerido (R$):</label>
-                        <input type="number" id="valorSugerido" step="0.01" placeholder="Pendente">
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label><i class="fas fa-user-tie"></i> Sócio que pagou:</label>
-                        <select id="socio" required>
-                            <option value="Mateus">Mateus</option>
-                            <option value="Jonathan">Jonathan</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label><i class="fas fa-truck"></i> Fornecedor:</label>
-                        <select id="fornecedor">
-                            <option value="HP Suplementos">HP Suplementos</option>
-                            <option value="Internet">Internet</option>
-                            <option value="Outro">Outro</option>
-                        </select>
-                    </div>
-                </div>
 
-                <div class="form-row">
-                    <div class="form-group" style="flex:2;">
-                        <label><i class="fas fa-image"></i> URL da imagem do produto:</label>
-                        <input type="url" id="imagemProduto" placeholder="https://i.ibb.co/xxxxx/produto.jpg">
-                        <small style="color:#888; display:block; margin-top:4px; font-size:11px;">
-                            <i class="fas fa-info-circle"></i> Use ImgBB, Postimages ou Google Drive para hospedar a imagem.<br>
-                            Exemplo: https://i.ibb.co/Rp3Sjz5V/CREATINA-MAX.jpg
-                        </small>
+                    <div class="form-section">
+                        <div class="form-section-title"><i class="fas fa-box"></i> Produto</div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label><i class="fas fa-bolt"></i> Repor produto já cadastrado:</label>
+                                <select id="produtoCompraExistente">
+                                    <option value="">Novo produto ou selecione um existente</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label><i class="fas fa-tag"></i> Marca:</label>
+                                <input type="text" id="marca" placeholder="Ex: Max Titanium" required>
+                            </div>
+                            <div class="form-group">
+                                <label><i class="fas fa-layer-group"></i> Família:</label>
+                                <select id="familia" required>
+                                    <option value="">Selecione...</option>
+                                    <option value="Pre Treino">Pré Treino</option>
+                                    <option value="Creatina">Creatina</option>
+                                    <option value="Whey">Whey</option>
+                                    <option value="Termogenico">Termogênico</option>
+                                    <option value="Hipercalorico">Hipercalórico</option>
+                                    <option value="BCAA">BCAA</option>
+                                    <option value="Diuretico">Diurético</option>
+                                    <option value="Barra Cereal">Barra Cereal</option>
+                                    <option value="Outros">Outros</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group" style="flex:2;">
+                                <label><i class="fas fa-box"></i> Nome:</label>
+                                <input type="text" id="nome" placeholder="Ex: Creatina" required>
+                            </div>
+                            <div class="form-group">
+                                <label><i class="fas fa-weight-hanging"></i> Peso/Volume:</label>
+                                <input type="text" id="peso" placeholder="Ex: 300g" required>
+                            </div>
+                            <div class="form-group">
+                                <label><i class="fas fa-utensils"></i> Sabor:</label>
+                                <input type="text" id="sabor" placeholder="Sem sabor">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <div class="form-section-title"><i class="fas fa-calculator"></i> Preço e margem</div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label><i class="fas fa-hashtag"></i> Quantidade:</label>
+                                <input type="number" id="quantidadeCompra" min="1" required>
+                            </div>
+                            <div class="form-group">
+                                <label><i class="fas fa-money-bill-wave"></i> Total pago (R$):</label>
+                                <input type="text" id="valorTotal" inputmode="decimal" autocomplete="off" placeholder="0,00" required>
+                            </div>
+                            <div class="form-group">
+                                <label><i class="fas fa-tag"></i> Venda sugerida (R$):</label>
+                                <input type="text" id="valorSugerido" inputmode="decimal" autocomplete="off" placeholder="Automático">
+                            </div>
+                        </div>
+                        <input type="hidden" id="valorUnitario">
+                        <input type="hidden" id="simulacao40">
+                    </div>
+
+                    <div class="form-section">
+                        <div class="form-section-title"><i class="fas fa-image"></i> Imagem do produto</div>
+                        <div class="image-picker">
+                            <div id="imagemProdutoPreview" class="image-preview"></div>
+                            <div class="image-actions">
+                                <input type="hidden" id="imagemProduto">
+                                <button type="button" id="buscarImagemProdutoOnline" class="btn-secondary">
+                                    <i class="fas fa-search"></i> Buscar imagem online
+                                </button>
+                                <div id="imagemBuscaStatus" class="image-search-status">Use marca, nome, peso e sabor para buscar a embalagem real.</div>
+                                <div id="imagemSugestoes" class="image-results"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <div class="assist-panel-header">
+                            <h3><i class="fas fa-clipboard-check"></i> Resumo</h3>
+                            <span id="compraStatusResumo" class="metric-pill">Novo lote</span>
+                        </div>
+                        <div class="summary-grid">
+                            <div class="summary-item">
+                                <span>Custo unitário</span>
+                                <strong id="resumoCustoUnitario">R$ 0,00</strong>
+                            </div>
+                            <div class="summary-item">
+                                <span>Venda sugerida</span>
+                                <strong id="resumoVendaSugerida">R$ 0,00</strong>
+                            </div>
+                            <div class="summary-item">
+                                <span>Lucro unitário</span>
+                                <strong id="resumoLucroUnitario">R$ 0,00</strong>
+                            </div>
+                            <div class="summary-item">
+                                <span>Margem</span>
+                                <strong id="resumoMargem">0%</strong>
+                            </div>
+                            <div class="summary-item">
+                                <span>Potencial do lote</span>
+                                <strong id="resumoPotencial">R$ 0,00</strong>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn-primary" style="width:100%; justify-content:center; margin-top:14px;">
+                            <i class="fas fa-plus"></i> Registrar Compra
+                        </button>
                     </div>
                 </div>
-
-                <button type="submit" class="btn-primary"><i class="fas fa-plus"></i> Registrar Compra</button>
             </form>
             <div id="compraMessage" class="message"></div>
         </section>
@@ -886,6 +1466,10 @@
 
             <!-- FILTROS -->
             <div class="filtros-area">
+                <div class="filtro-group">
+                    <label><i class="fas fa-search"></i> Buscar produto:</label>
+                    <input type="text" id="filtroBuscaEstoque" placeholder="Nome, marca, sabor...">
+                </div>
                 <div class="filtro-group">
                     <label><i class="fas fa-tag"></i> Filtrar por Marca:</label>
                     <select id="filtroMarca">
@@ -928,7 +1512,7 @@
                         <option value="dia">Hoje</option>
                         <option value="semana">Esta semana</option>
                         <option value="mes">Este mês</option>
-                        <option value="todos">Todos</option>
+                        <option value="todos" selected>Todos</option>
                     </select>
                 </div>
                 <div class="filtro-group" style="display:flex; align-items:flex-end;">
@@ -937,6 +1521,143 @@
             </div>
 
             <div id="relatorioDados" class="relatorio-box"></div>
+        </section>
+
+        <!-- ===== ABA CAIXA ===== -->
+        <section id="caixa" class="tab-content">
+            <div class="page-header">
+                <h2><i class="fas fa-wallet"></i> Caixa</h2>
+                <p class="subtitle">Ajuste entradas e retiradas que não vêm de vendas, compras ou despesas.</p>
+            </div>
+
+            <div class="cash-layout">
+                <form id="caixaForm" class="assist-panel">
+                    <div class="assist-panel-header">
+                        <h3><i class="fas fa-plus-circle"></i> Novo movimento</h3>
+                        <span class="metric-pill">Caixa</span>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label><i class="far fa-calendar-alt"></i> Data:</label>
+                            <input type="date" id="dataCaixa" required>
+                        </div>
+                        <div class="form-group">
+                            <label><i class="fas fa-arrow-right-arrow-left"></i> Tipo:</label>
+                            <select id="tipoCaixa" required>
+                                <option value="entrada">Entrada</option>
+                                <option value="saida">Saída</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label><i class="fas fa-list"></i> Categoria:</label>
+                            <select id="categoriaCaixa">
+                                <option value="Aporte">Aporte</option>
+                                <option value="Retirada">Retirada</option>
+                                <option value="Ajuste">Ajuste</option>
+                                <option value="Outro">Outro</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label><i class="fas fa-money-bill-wave"></i> Valor (R$):</label>
+                            <input type="text" id="valorCaixa" inputmode="decimal" autocomplete="off" placeholder="0,00" required>
+                        </div>
+                        <div class="form-group" style="flex:2;">
+                            <label><i class="fas fa-align-left"></i> Descrição:</label>
+                            <input type="text" id="descricaoCaixa" placeholder="Ex: retirada dos sócios">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn-primary"><i class="fas fa-check"></i> Registrar Movimento</button>
+                </form>
+
+                <div class="assist-panel">
+                    <div class="assist-panel-header">
+                        <h3><i class="fas fa-chart-line"></i> Posição do caixa</h3>
+                        <span id="caixaResumo" class="metric-pill">R$ 0,00</span>
+                    </div>
+                    <div id="caixaLista" class="compact-list"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== ABA DESPESAS ===== -->
+        <section id="despesas" class="tab-content">
+            <div class="page-header">
+                <h2><i class="fas fa-receipt"></i> Despesas</h2>
+                <p class="subtitle">Registre gastos da loja e acompanhe no relatório financeiro.</p>
+            </div>
+
+            <form id="despesaForm">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label><i class="far fa-calendar-alt"></i> Data:</label>
+                        <input type="date" id="dataDespesa" required>
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-list"></i> Categoria:</label>
+                        <select id="categoriaDespesa" required>
+                            <option value="Aluguel">Aluguel</option>
+                            <option value="Energia">Energia</option>
+                            <option value="Internet">Internet</option>
+                            <option value="Marketing">Marketing</option>
+                            <option value="Transporte">Transporte</option>
+                            <option value="Embalagens">Embalagens</option>
+                            <option value="Taxas">Taxas</option>
+                            <option value="Sistema">Sistema</option>
+                            <option value="Outros">Outros</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-money-bill-wave"></i> Valor (R$):</label>
+                        <input type="text" id="valorDespesa" inputmode="decimal" autocomplete="off" placeholder="0,00" required>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group" style="flex:2;">
+                        <label><i class="fas fa-align-left"></i> Descrição:</label>
+                        <input type="text" id="descricaoDespesa" placeholder="Ex: Conta de energia" required>
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-credit-card"></i> Pagamento:</label>
+                        <select id="pagamentoDespesa">
+                            <option value="Pix">Pix</option>
+                            <option value="Dinheiro">Dinheiro</option>
+                            <option value="Débito">Débito</option>
+                            <option value="Crédito">Crédito</option>
+                            <option value="Boleto">Boleto</option>
+                            <option value="Transferência">Transferência</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-user-tie"></i> Responsável:</label>
+                        <select id="responsavelDespesa">
+                            <option value="Loja">Loja</option>
+                            <option value="Mateus">Mateus</option>
+                            <option value="Jonathan">Jonathan</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label><i class="fas fa-note-sticky"></i> Observação:</label>
+                        <input type="text" id="observacaoDespesa" placeholder="Opcional">
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-primary"><i class="fas fa-plus"></i> Registrar Despesa</button>
+            </form>
+            <div id="despesaMessage" class="message"></div>
+
+            <div class="assist-panel" style="margin-top:22px;">
+                <div class="assist-panel-header">
+                    <h3><i class="fas fa-list"></i> Despesas registradas</h3>
+                    <span id="despesasResumo" class="metric-pill">R$ 0,00</span>
+                </div>
+                <div id="despesasLista" class="compact-list"></div>
+            </div>
         </section>
 
         <!-- ===== ABA PERDAS ===== -->
@@ -990,7 +1711,7 @@
                     </div>
                     <div class="form-group">
                         <label><i class="fas fa-image"></i> URL do logo:</label>
-                        <input type="url" id="marcaLogo" placeholder="https://i.ibb.co/xxxxx/logo.png">
+                        <input type="url" id="marcaLogo" placeholder="Opcional, até conectarmos busca online">
                     </div>
                 </div>
                 <button type="submit" class="btn-primary"><i class="fas fa-plus"></i> Adicionar/Atualizar Marca</button>
@@ -1035,7 +1756,7 @@
     </main>
 
     <!-- SCRIPTS -->
-    <script type="module" src="firebase-config.js"></script>
-    <script type="module" src="script.js"></script>
+    <script type="module" src="firebase-config.js?v=20260808-9"></script>
+    <script type="module" src="script.js?v=20260808-9"></script>
 </body>
 </html>

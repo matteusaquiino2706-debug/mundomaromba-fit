@@ -1,6 +1,6 @@
 // Importar as funções necessárias do Firebase
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
-import { getFirestore, collection, addDoc, getDocs, getDoc, doc, updateDoc, deleteDoc, query, where, orderBy } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs, getDoc, doc, updateDoc, deleteDoc, query, where, orderBy, runTransaction, writeBatch } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js";
 
 // Sua configuração do Firebase
@@ -31,6 +31,8 @@ window.deleteDoc = deleteDoc;
 window.query = query;
 window.where = where;
 window.orderBy = orderBy;
+window.runTransaction = runTransaction;
+window.writeBatch = writeBatch;
 window.signInWithEmailAndPassword = signInWithEmailAndPassword;
 window.onAuthStateChanged = onAuthStateChanged;
 window.signOut = signOut;

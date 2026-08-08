@@ -523,19 +523,24 @@ body {
     transform: scale(1.05);
 }
 
+.lista-items {
+    display: grid;
+    gap: 12px;
+}
+
 /* ============================================================
    RELATÓRIOS
    ============================================================ */
 .relatorio-card {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
     gap: 16px;
     margin-bottom: 20px;
 }
 
 .card {
     background: rgba(255, 255, 255, 0.04);
-    border-radius: 14px;
+    border-radius: 10px;
     padding: 18px 20px;
     text-align: center;
     border: 1px solid rgba(255, 255, 255, 0.06);
@@ -934,10 +939,21 @@ select:focus {
     .form-group {
         min-width: 100%;
     }
+
+    .form-group input,
+    .form-group select,
+    button {
+        min-height: 46px;
+        font-size: 16px;
+    }
     
     .relatorio-card {
         grid-template-columns: 1fr 1fr;
         gap: 10px;
+    }
+
+    .card {
+        padding: 14px 12px;
     }
     
     .card .valor {
@@ -988,6 +1004,36 @@ select:focus {
     #toggleModoEstoque {
         font-size: 11px !important;
         padding: 4px 10px !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .relatorio-card {
+        grid-template-columns: 1fr;
+    }
+
+    .card h3 {
+        font-size: 10px;
+    }
+
+    .card .valor {
+        font-size: 20px;
+    }
+
+    .lote-item,
+    .lote-item .info,
+    .lote-item .acoes {
+        width: 100%;
+        align-items: stretch;
+    }
+
+    .lote-item {
+        flex-direction: column;
+    }
+
+    .lote-item .acoes button {
+        flex: 1;
+        min-height: 40px;
     }
 }
 

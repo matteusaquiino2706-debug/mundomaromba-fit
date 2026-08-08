@@ -4,128 +4,499 @@
 
 // Variáveis globais
 let currentUser = null;
+let precoSugeridoAtualVenda = null;
+let bloqueandoAtualizacaoDesconto = false;
+let produtosCompraCache = {};
+let produtosVendaCache = [];
 
 // ============================================================
-// TABELA DE TAXAS DA MAQUINETA (PROMOÇÃO 3 MESES)
+// TABELA DE TAXAS DA MAQUINETA
 // ============================================================
 const TAXAS_MAQUINETA = {
-    debito: 0.0057,
-    credito_1x: 0.0057,
-    credito_2x: 0.0397,
-    credito_3x: 0.0397,
-    credito_4x: 0.0497,
-    credito_5x: 0.0697,
-    credito_6x: 0.0697,
-    credito_7x: 0.0797,
-    credito_8x: 0.0797,
-    credito_9x: 0.0797,
-    credito_10x: 0.0797,
-    credito_11x: 0.0797,
-    credito_12x: 0.0797,
-    credito_13x: 0.1487,
-    credito_14x: 0.1487,
-    credito_15x: 0.1487,
-    credito_16x: 0.1487,
-    credito_17x: 0.1487,
-    credito_18x: 0.1487
+    debito: 0.0087,
+    credito_1x: 0.0308,
+    credito_2x: 0.0579,
+    credito_3x: 0.0659,
+    credito_4x: 0.0839,
+    credito_5x: 0.0859,
+    credito_6x: 0.0869
 };
+
+// ============================================================
+// HELPERS DE PRODUTO, PREÇO E TAXAS
+// ============================================================
+function normalizarTextoProduto(valor) {
+    return (valor || '').trim();
+}
+
+function criarChaveProduto(produto, marca, sabor, peso) {
+    return [
+        normalizarTextoProduto(produto),
+        normalizarTextoProduto(marca),
+        normalizarTextoProduto(sabor || 'Sem sabor'),
+        normalizarTextoProduto(peso)
+    ].join('|||');
+}
+
+function criarChaveProdutoDoLote(lote) {
+    return criarChaveProduto(lote.produto, lote.marca, lote.sabor, lote.peso);
+}
+
+function decodificarChaveProduto(chave) {
+    const [produto = '', marca = '', sabor = '', peso = ''] = (chave || '').split('|||');
+    return { produto, marca, sabor, peso };
+}
+
+function loteCorrespondeProduto(lote, produtoSelecionado) {
+    return criarChaveProdutoDoLote(lote) === criarChaveProduto(
+        produtoSelecionado.produto,
+        produtoSelecionado.marca,
+        produtoSelecionado.sabor,
+        produtoSelecionado.peso
+    );
+}
+
+function obterProdutoSelecionadoVenda() {
+    const chave = document.getElementById('produtoVenda')?.value || '';
+    if (!chave) return null;
+    return decodificarChaveProduto(chave);
+}
+
+function calcularTaxaPagamento(pagamento, parcelas) {
+    if (pagamento === 'Débito') {
+        return { taxa: TAXAS_MAQUINETA.debito, taxaLabel: '0,87%' };
+    }
+
+    if (pagamento === 'Crédito') {
+        const parcelasValidas = Math.min(Math.max(parseInt(parcelas) || 1, 1), 6);
+        const key = `credito_${parcelasValidas}x`;
+        const taxa = TAXAS_MAQUINETA[key] || 0;
+        return { taxa, taxaLabel: `${(taxa * 100).toFixed(2).replace('.', ',')}%` };
+    }
+
+    return { taxa: 0, taxaLabel: '0%' };
+}
+
+function converterNumero(valor) {
+    if (typeof valor === 'number') {
+        return Number.isFinite(valor) ? valor : 0;
+    }
+
+    if (typeof valor !== 'string') return 0;
+
+    const limpo = valor.replace(/[^\d,.-]/g, '').trim();
+    if (!limpo) return 0;
+
+    const normalizado = limpo.includes(',')
+        ? limpo.replace(/\./g, '').replace(',', '.')
+        : limpo;
+    const numero = parseFloat(normalizado);
+    return Number.isFinite(numero) ? numero : 0;
+}
+
+function converterData(valor) {
+    if (!valor) return null;
+    if (valor instanceof Date) return valor;
+    if (typeof valor.toDate === 'function') return valor.toDate();
+
+    if (typeof valor === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(valor)) {
+        const [ano, mes, dia] = valor.split('-').map(Number);
+        return new Date(ano, mes - 1, dia);
+    }
+
+    const data = new Date(valor);
+    return Number.isNaN(data.getTime()) ? null : data;
+}
+
+function dentroDoPeriodo(dataValor, dataInicio, periodo) {
+    if (periodo === 'todos') return true;
+
+    const data = converterData(dataValor);
+    if (!data) return false;
+
+    return data >= dataInicio;
+}
+
+function normalizarFormaPagamento(valor) {
+    const texto = (valor || '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    if (texto.includes('pix')) return 'Pix';
+    if (texto.includes('dinheiro')) return 'Dinheiro';
+    if (texto.includes('debito')) return 'Débito';
+    if (texto.includes('credito')) return 'Crédito';
+    return valor;
+}
+
+function normalizarComparacao(valor) {
+    return (valor || '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+}
+
+function formatarMoeda(valor) {
+    return (converterNumero(valor)).toLocaleString('pt-BR', {
+        style: 'currency',
+        currency: 'BRL'
+    });
+}
+
+function formatarPercentual(valor) {
+    return `${converterNumero(valor).toFixed(1).replace('.', ',')}%`;
+}
+
+function formatarDataCurta(valor) {
+    const data = converterData(valor);
+    if (!data) return '-';
+    return data.toLocaleDateString('pt-BR');
+}
+
+function obterDataInputHoje() {
+    const hoje = new Date();
+    const ano = hoje.getFullYear();
+    const mes = String(hoje.getMonth() + 1).padStart(2, '0');
+    const dia = String(hoje.getDate()).padStart(2, '0');
+    return `${ano}-${mes}-${dia}`;
+}
+
+function escaparHtml(valor) {
+    const div = document.createElement('div');
+    div.textContent = valor ?? '';
+    return div.innerHTML;
+}
+
+function obterIniciaisProduto(produto, marca) {
+    const texto = `${marca || ''} ${produto || ''}`.trim();
+    if (!texto) return 'MM';
+
+    return texto
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map(parte => parte[0])
+        .join('')
+        .toUpperCase();
+}
+
+function renderizarFallbackProduto(produto, marca, compacto = false) {
+    return `
+        <div class="product-fallback">
+            <div class="initials">${escaparHtml(obterIniciaisProduto(produto, marca))}</div>
+            <div class="fallback-text">${escaparHtml(produto || 'Produto')}</div>
+            ${compacto ? '' : `<div style="font-size:10px; color:#aaa;">${escaparHtml(marca || 'Mundo Maromba')}</div>`}
+        </div>
+    `;
+}
+
+function renderizarImagemProduto(produto, marca, imagemUrl, compacto = false) {
+    if (imagemUrl && imagemUrl.trim() !== '') {
+        return `
+            <img src="${escaparHtml(imagemUrl)}" alt="${escaparHtml(produto)}" style="width:100%; height:100%; object-fit:contain; padding:${compacto ? '4px' : '6px'};" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+            <div style="display:none; width:100%; height:100%;">${renderizarFallbackProduto(produto, marca, compacto)}</div>
+        `;
+    }
+
+    return renderizarFallbackProduto(produto, marca, compacto);
+}
+
+function renderizarLogoMarca(marca, logoUrl, tamanho = '24px') {
+    if (logoUrl && logoUrl.trim() !== '') {
+        return `<img src="${escaparHtml(logoUrl)}" alt="${escaparHtml(marca)}" style="width:${tamanho}; height:${tamanho}; object-fit:contain; border-radius:6px;">`;
+    }
+
+    return `<span style="width:${tamanho}; height:${tamanho}; border-radius:6px; display:inline-flex; align-items:center; justify-content:center; background:rgba(245,166,35,0.1); color:#F5A623; font-size:11px; font-weight:800;">${escaparHtml(obterIniciaisProduto('', marca).slice(0, 2))}</span>`;
+}
+
+function atualizarPreviewImagemProduto() {
+    const preview = document.getElementById('imagemProdutoPreview');
+    if (!preview) return;
+
+    const url = document.getElementById('imagemProduto')?.value.trim();
+    const produto = document.getElementById('nome')?.value.trim();
+    const marca = document.getElementById('marca')?.value.trim();
+
+    preview.innerHTML = renderizarImagemProduto(produto, marca, url, false);
+}
+
+function montarConsultaImagemProduto() {
+    return [
+        document.getElementById('marca')?.value,
+        document.getElementById('nome')?.value,
+        document.getElementById('peso')?.value,
+        document.getElementById('sabor')?.value,
+        'suplemento embalagem'
+    ].filter(Boolean).join(' ').trim();
+}
+
+function definirStatusBuscaImagem(texto, tipo = 'info') {
+    const status = document.getElementById('imagemBuscaStatus');
+    if (!status) return;
+
+    const cores = {
+        info: '#888',
+        sucesso: '#4caf50',
+        erro: '#ff6b6b',
+        aviso: '#F5A623'
+    };
+    status.textContent = texto;
+    status.style.color = cores[tipo] || cores.info;
+}
+
+function selecionarImagemProduto(url) {
+    const input = document.getElementById('imagemProduto');
+    if (input) input.value = url || '';
+    atualizarPreviewImagemProduto();
+    definirStatusBuscaImagem('Imagem selecionada para este lote.', 'sucesso');
+}
+
+async function buscarImagemProdutoOnline() {
+    const consulta = montarConsultaImagemProduto();
+    const sugestoes = document.getElementById('imagemSugestoes');
+
+    if (!consulta || consulta.length < 4) {
+        definirStatusBuscaImagem('Preencha marca e nome do produto para buscar.', 'aviso');
+        return;
+    }
+
+    if (sugestoes) sugestoes.innerHTML = '';
+    definirStatusBuscaImagem('Buscando imagem real do produto...', 'info');
+
+    try {
+        const resposta = await fetch(`/.netlify/functions/buscar-imagens?q=${encodeURIComponent(consulta)}`);
+        if (!resposta.ok) {
+            throw new Error('Busca online ainda não conectada.');
+        }
+
+        const dados = await resposta.json();
+        const imagens = Array.isArray(dados.imagens) ? dados.imagens : [];
+
+        if (imagens.length === 0) {
+            definirStatusBuscaImagem('Nenhuma imagem encontrada para esse produto.', 'aviso');
+            return;
+        }
+
+        if (sugestoes) {
+            const imagensExibidas = imagens.slice(0, 6);
+            sugestoes.innerHTML = imagensExibidas.map((img, index) => `
+                <button type="button" class="image-result" data-image-index="${index}">
+                    <img src="${escaparHtml(img.thumbnail || img.url)}" alt="${escaparHtml(img.titulo || 'Imagem do produto')}">
+                </button>
+            `).join('');
+
+            sugestoes.querySelectorAll('.image-result').forEach(botao => {
+                botao.addEventListener('click', () => {
+                    const index = parseInt(botao.dataset.imageIndex, 10);
+                    selecionarImagemProduto(imagensExibidas[index]?.url || '');
+                });
+            });
+        }
+
+        definirStatusBuscaImagem('Escolha uma das imagens encontradas.', 'sucesso');
+    } catch (error) {
+        console.warn('Busca online de imagem indisponível:', error);
+        definirStatusBuscaImagem('Busca automática precisa de uma API conectada no Netlify.', 'aviso');
+        mostrarNotificacao('Para buscar imagens automaticamente, precisamos conectar uma API de busca no Netlify.', 'aviso');
+    }
+}
+
+window.selecionarImagemProduto = selecionarImagemProduto;
+
+function vendaCorrespondeProduto(venda, produtoSelecionado) {
+    if (!produtoSelecionado) return false;
+
+    const chaveAtual = criarChaveProduto(
+        produtoSelecionado.produto,
+        produtoSelecionado.marca,
+        produtoSelecionado.sabor,
+        produtoSelecionado.peso
+    );
+
+    if (venda.produtoChave) {
+        return venda.produtoChave === chaveAtual;
+    }
+
+    const mesmoProduto = normalizarComparacao(venda.produto) === normalizarComparacao(produtoSelecionado.produto);
+    const mesmaMarca = !venda.marca || normalizarComparacao(venda.marca) === normalizarComparacao(produtoSelecionado.marca);
+    const mesmoSabor = !venda.sabor || normalizarComparacao(venda.sabor) === normalizarComparacao(produtoSelecionado.sabor);
+    const mesmoPeso = !venda.peso || normalizarComparacao(venda.peso) === normalizarComparacao(produtoSelecionado.peso);
+
+    return mesmoProduto && mesmaMarca && mesmoSabor && mesmoPeso;
+}
+
+async function buscarLotesDisponiveisPorProduto(produtoSelecionado) {
+    if (!produtoSelecionado?.produto) return [];
+
+    const q = window.query(
+        window.collection(window.db, 'lotes'),
+        window.where('produto', '==', produtoSelecionado.produto),
+        window.where('ativo', '==', true)
+    );
+    const snapshot = await window.getDocs(q);
+    const lotes = [];
+
+    snapshot.forEach(docSnap => {
+        const lote = docSnap.data();
+        const saldo = (lote.quantidade || 0) - (lote.vendido || 0);
+        if (saldo > 0 && loteCorrespondeProduto(lote, produtoSelecionado)) {
+            lotes.push({
+                id: docSnap.id,
+                ref: docSnap.ref,
+                ...lote,
+                saldo
+            });
+        }
+    });
+
+    return lotes.sort((a, b) => new Date(a.dataCompra) - new Date(b.dataCompra));
+}
 
 // ============================================================
 // INICIALIZAÇÃO
 // ============================================================
 document.addEventListener('DOMContentLoaded', function() {
-    
+
     // Página de Login
     const loginForm = document.getElementById('loginForm');
     if (loginForm) {
         loginForm.addEventListener('submit', fazerLogin);
         return;
     }
-    
+
     // Dashboard
     const logoutBtn = document.getElementById('logoutBtn');
     const logoutBtnSidebar = document.getElementById('logoutBtnSidebar');
-    
+
     if (logoutBtn || logoutBtnSidebar) {
         verificarLogin();
-        
+
         // Configurar navegação da sidebar
         document.querySelectorAll('.nav-btn').forEach(btn => {
             btn.addEventListener('click', () => mudarAba(btn.dataset.tab));
         });
-        
+
         // Compatibilidade com abas antigas (caso ainda existam)
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.addEventListener('click', () => mudarAba(btn.dataset.tab));
         });
-        
+
         // Configurar formulários
         document.getElementById('vendaForm')?.addEventListener('submit', registrarVenda);
         document.getElementById('compraForm')?.addEventListener('submit', registrarCompra);
         document.getElementById('perdaForm')?.addEventListener('submit', registrarPerda);
+        document.getElementById('despesaForm')?.addEventListener('submit', registrarDespesa);
+        document.getElementById('caixaForm')?.addEventListener('submit', registrarMovimentoCaixa);
         document.getElementById('atualizarRelatorio')?.addEventListener('click', carregarRelatorio);
-        
+
         // FORMULÁRIO DE MARCAS
         const marcaForm = document.getElementById('marcaForm');
         if (marcaForm) {
             marcaForm.addEventListener('submit', salvarMarca);
             console.log('✅ Evento do formulário de marcas configurado');
         }
-        
+
         // Calcular unitário na compra
         document.getElementById('valorTotal')?.addEventListener('input', calcularUnitario);
         document.getElementById('quantidadeCompra')?.addEventListener('input', calcularUnitario);
-        
+        document.getElementById('valorSugerido')?.addEventListener('input', atualizarResumoCompra);
+        document.getElementById('marca')?.addEventListener('input', atualizarPreviewImagemProduto);
+        document.getElementById('nome')?.addEventListener('input', function() {
+            atualizarPreviewImagemProduto();
+            atualizarResumoCompra();
+        });
+        document.getElementById('peso')?.addEventListener('input', atualizarResumoCompra);
+        document.getElementById('sabor')?.addEventListener('input', atualizarResumoCompra);
+        document.getElementById('buscarImagemProdutoOnline')?.addEventListener('click', buscarImagemProdutoOnline);
+        document.getElementById('produtoCompraExistente')?.addEventListener('change', preencherCompraPorProdutoExistente);
+        document.getElementById('buscaProdutoVenda')?.addEventListener('input', function() {
+            renderizarSelectVenda(this.value);
+        });
+        configurarAtalhosVenda();
+
         // Carregar dados iniciais
         carregarSelectProdutos();
         carregarEstoqueLotes();
         carregarRelatorio();
-        
+        definirDataDespesaPadrao();
+        definirDataCompraPadrao();
+        definirDataCaixaPadrao();
+        atualizarResumoCompra();
+        atualizarPreviewImagemProduto();
+        carregarDespesas();
+        carregarCaixa();
+        carregarProdutosCompraRapida();
+
         // Recalcular quando o valor total for alterado manualmente
         document.getElementById('previewTotal')?.addEventListener('input', function() {
-            calcularPreview();
-        });
-        
-        document.getElementById('quantidadeVenda')?.addEventListener('input', function() {
-            const precoUnitario = parseFloat(document.getElementById('precoVenda').value) || 0;
-            const quantidade = parseInt(this.value) || 1;
-            if (precoUnitario > 0) {
-                document.getElementById('previewTotal').value = (precoUnitario * quantidade).toFixed(2);
+            const valorTotal = converterNumero(this.value);
+            const quantidade = parseInt(document.getElementById('quantidadeVenda').value) || 1;
+            const pagamento = document.getElementById('pagamentoVenda')?.value;
+            const parcelas = parseInt(document.getElementById('parcelasVenda')?.value) || 1;
+            const { taxa } = calcularTaxaPagamento(pagamento, parcelas);
+            const valorBase = repasseJurosAtivo() && taxa > 0 ? valorTotal * (1 - taxa) : valorTotal;
+            if (valorTotal > 0 && quantidade > 0) {
+                document.getElementById('precoVenda').value = (valorBase / quantidade).toFixed(2).replace('.', ',');
+                atualizarCamposDesconto();
             }
             calcularPreview();
         });
-        
+
+        document.getElementById('quantidadeVenda')?.addEventListener('input', function() {
+            atualizarAtalhosQuantidade();
+            atualizarTotalVendaPorPrecoUnitario();
+            atualizarCamposDesconto();
+            calcularPreview();
+        });
+
         // Eventos do histórico
         document.getElementById('filtroPeriodoHistorico')?.addEventListener('change', carregarHistoricoVendas);
         document.getElementById('aplicarFiltrosHistorico')?.addEventListener('click', carregarHistoricoVendas);
         document.getElementById('filtroClienteHistorico')?.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') carregarHistoricoVendas();
         });
-        
+
         // Eventos para calcular preview
         document.getElementById('pagamentoVenda')?.addEventListener('change', function() {
             toggleParcelas();
+            atualizarAtalhosPagamento();
+            atualizarTotalVendaPorPrecoUnitario();
             calcularPreview();
         });
-        document.getElementById('parcelasVenda')?.addEventListener('change', calcularPreview);
-        document.getElementById('precoVenda')?.addEventListener('input', calcularPreview);
-        document.getElementById('quantidadeVenda')?.addEventListener('input', calcularPreview);
-        
+        document.getElementById('parcelasVenda')?.addEventListener('change', function() {
+            atualizarTotalVendaPorPrecoUnitario();
+            calcularPreview();
+        });
+        document.getElementById('repasseJuros')?.addEventListener('change', function() {
+            atualizarTotalVendaPorPrecoUnitario();
+            calcularPreview();
+        });
+        document.getElementById('precoVenda')?.addEventListener('input', function() {
+            atualizarTotalVendaPorPrecoUnitario();
+            atualizarCamposDesconto();
+            calcularPreview();
+        });
+        document.getElementById('precoVenda')?.addEventListener('keydown', function(e) {
+            if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                e.preventDefault();
+            }
+        });
+        document.getElementById('descontoValor')?.addEventListener('input', aplicarDescontoPorValor);
+        document.getElementById('descontoPercentual')?.addEventListener('input', aplicarDescontoPorPercentual);
+
         // Eventos dos filtros do estoque
         document.getElementById('filtroMarca')?.addEventListener('change', carregarEstoqueLotes);
         document.getElementById('filtroFamilia')?.addEventListener('change', carregarEstoqueLotes);
+        document.getElementById('filtroBuscaEstoque')?.addEventListener('input', carregarEstoqueLotes);
         document.getElementById('limparFiltros')?.addEventListener('click', function() {
             document.getElementById('filtroMarca').value = '';
             document.getElementById('filtroFamilia').value = '';
+            const buscaEstoque = document.getElementById('filtroBuscaEstoque');
+            if (buscaEstoque) buscaEstoque.value = '';
             carregarEstoqueLotes();
         });
-        
+
         // Evento para buscar informações do produto ao selecionar
         document.getElementById('produtoVenda')?.addEventListener('change', function() {
             buscarInfoProduto();
             preencherPrecoSugerido();
+            atualizarResumoVenda();
         });
-        
+
         // Se a aba de marcas estiver visível, carregar marcas
         if (document.getElementById('marcas')?.classList.contains('active')) {
             carregarMarcas();
@@ -142,7 +513,7 @@ async function fazerLogin(event) {
     const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
     const messageDiv = document.getElementById('loginMessage');
-    
+
     try {
         const userCredential = await window.signInWithEmailAndPassword(window.auth, email, password);
         currentUser = userCredential.user;
@@ -189,29 +560,43 @@ document.getElementById('logoutBtnSidebar')?.addEventListener('click', async () 
 function mudarAba(abaId) {
     // Esconder todas as abas
     document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
-    
+
     // Remover active dos botões da sidebar
     document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
-    
+
     // Remover active das abas antigas (se existirem)
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-    
+
     // Mostrar aba selecionada
     const targetTab = document.getElementById(abaId);
     if (targetTab) targetTab.classList.add('active');
-    
+
     // Ativar botão da sidebar correspondente
     const navBtn = document.querySelector(`.nav-btn[data-tab="${abaId}"]`);
     if (navBtn) navBtn.classList.add('active');
-    
+
     // Ativar botão de aba antigo (se existir)
     const tabBtn = document.querySelector(`.tab-btn[data-tab="${abaId}"]`);
     if (tabBtn) tabBtn.classList.add('active');
-    
+
     // Carregar dados específicos da aba
     if (abaId === 'estoque') carregarEstoqueLotes();
+    if (abaId === 'compras') {
+        definirDataCompraPadrao();
+        carregarProdutosCompraRapida();
+        atualizarResumoCompra();
+        atualizarPreviewImagemProduto();
+    }
     if (abaId === 'vendas') carregarSelectProdutos();
     if (abaId === 'relatorios') carregarRelatorio();
+    if (abaId === 'caixa') {
+        definirDataCaixaPadrao();
+        carregarCaixa();
+    }
+    if (abaId === 'despesas') {
+        definirDataDespesaPadrao();
+        carregarDespesas();
+    }
     if (abaId === 'marcas') carregarMarcas();
     if (abaId === 'historico') carregarHistoricoVendas();
 }
@@ -219,53 +604,185 @@ function mudarAba(abaId) {
 // ============================================================
 // COMPRAS (CRIA NOVO LOTE)
 // ============================================================
+function definirDataCompraPadrao() {
+    const dataCompra = document.getElementById('dataCompra');
+    if (dataCompra && !dataCompra.value) {
+        dataCompra.value = obterDataInputHoje();
+    }
+}
+
+function atualizarTexto(id, texto) {
+    const elemento = document.getElementById(id);
+    if (elemento) elemento.textContent = texto;
+}
+
 function calcularUnitario() {
-    const valorTotal = parseFloat(document.getElementById('valorTotal')?.value) || 0;
+    const valorTotal = converterNumero(document.getElementById('valorTotal')?.value);
     const quantidade = parseInt(document.getElementById('quantidadeCompra')?.value) || 1;
-    
+
     if (valorTotal > 0 && quantidade > 0) {
         const unitario = valorTotal / quantidade;
-        document.getElementById('valorUnitario').value = unitario.toFixed(2);
-        document.getElementById('simulacao40').value = (unitario * 1.4).toFixed(2);
+        document.getElementById('valorUnitario').value = unitario.toFixed(2).replace('.', ',');
+        document.getElementById('simulacao40').value = (unitario * 1.4).toFixed(2).replace('.', ',');
+    } else {
+        document.getElementById('valorUnitario').value = '';
+        document.getElementById('simulacao40').value = '';
     }
+
+    atualizarResumoCompra();
+}
+
+function atualizarResumoCompra() {
+    const valorTotal = converterNumero(document.getElementById('valorTotal')?.value);
+    const quantidade = parseInt(document.getElementById('quantidadeCompra')?.value) || 0;
+    const custoUnitario = quantidade > 0 ? valorTotal / quantidade : 0;
+    const vendaSugeridaInformada = converterNumero(document.getElementById('valorSugerido')?.value);
+    const vendaSugerida = vendaSugeridaInformada || (custoUnitario > 0 ? custoUnitario * 1.4 : 0);
+    const lucroUnitario = Math.max(0, vendaSugerida - custoUnitario);
+    const margem = vendaSugerida > 0 ? (lucroUnitario / vendaSugerida) * 100 : 0;
+    const potencial = lucroUnitario * quantidade;
+
+    atualizarTexto('resumoCustoUnitario', formatarMoeda(custoUnitario));
+    atualizarTexto('resumoVendaSugerida', vendaSugerida ? formatarMoeda(vendaSugerida) : 'Pendente');
+    atualizarTexto('resumoLucroUnitario', formatarMoeda(lucroUnitario));
+    atualizarTexto('resumoMargem', `${margem.toFixed(1).replace('.', ',')}%`);
+    atualizarTexto('resumoPotencial', formatarMoeda(potencial));
+
+    const status = document.getElementById('compraStatusResumo');
+    if (status) {
+        const nome = document.getElementById('nome')?.value.trim();
+        const peso = document.getElementById('peso')?.value.trim();
+        status.textContent = nome ? `${nome}${peso ? ` ${peso}` : ''}` : 'Novo lote';
+    }
+}
+
+async function carregarProdutosCompraRapida() {
+    const select = document.getElementById('produtoCompraExistente');
+    if (!select) return;
+
+    try {
+        const snapshot = await window.getDocs(window.collection(window.db, 'lotes'));
+        produtosCompraCache = {};
+
+        snapshot.forEach(docSnap => {
+            const lote = docSnap.data();
+            const chave = criarChaveProdutoDoLote(lote);
+
+            if (!produtosCompraCache[chave]) {
+                produtosCompraCache[chave] = {
+                    produto: lote.produto || '',
+                    marca: lote.marca || '',
+                    sabor: lote.sabor || 'Sem sabor',
+                    peso: lote.peso || '',
+                    familia: lote.familia || 'Outros',
+                    valorSugerido: null,
+                    imagemUrl: '',
+                    totalComprado: 0
+                };
+            }
+
+            produtosCompraCache[chave].totalComprado += converterNumero(lote.quantidade);
+
+            if (converterNumero(lote.valorSugerido) > 0) {
+                produtosCompraCache[chave].valorSugerido = converterNumero(lote.valorSugerido);
+            }
+
+            if (lote.imagemUrl) {
+                produtosCompraCache[chave].imagemUrl = lote.imagemUrl;
+            }
+        });
+
+        const valorAtual = select.value;
+        select.innerHTML = '<option value="">Novo produto ou selecione um existente</option>';
+
+        Object.entries(produtosCompraCache)
+            .sort(([, a], [, b]) => `${a.marca} ${a.produto}`.localeCompare(`${b.marca} ${b.produto}`, 'pt-BR'))
+            .forEach(([chave, produto]) => {
+                const option = document.createElement('option');
+                option.value = chave;
+                option.textContent = `${produto.marca} - ${produto.produto}${produto.peso ? ` (${produto.peso})` : ''}${produto.sabor && produto.sabor !== 'Sem sabor' ? ` - ${produto.sabor}` : ''}`;
+                select.appendChild(option);
+            });
+
+        if (produtosCompraCache[valorAtual]) {
+            select.value = valorAtual;
+        }
+    } catch (error) {
+        console.error('Erro ao carregar produtos para compra rápida:', error);
+    }
+}
+
+function preencherCompraPorProdutoExistente() {
+    const select = document.getElementById('produtoCompraExistente');
+    const produto = produtosCompraCache[select?.value];
+    if (!produto) return;
+
+    document.getElementById('marca').value = produto.marca || '';
+    document.getElementById('familia').value = produto.familia || 'Outros';
+    document.getElementById('nome').value = produto.produto || '';
+    document.getElementById('peso').value = produto.peso || '';
+    document.getElementById('sabor').value = produto.sabor === 'Sem sabor' ? '' : (produto.sabor || '');
+    document.getElementById('valorSugerido').value = produto.valorSugerido ? produto.valorSugerido.toFixed(2).replace('.', ',') : '';
+    document.getElementById('imagemProduto').value = produto.imagemUrl || '';
+
+    atualizarResumoCompra();
+    atualizarPreviewImagemProduto();
 }
 
 async function registrarCompra(event) {
     event.preventDefault();
-    
-    const lote = {
-        produto: document.getElementById('nome').value.trim(),
-        marca: document.getElementById('marca').value.trim(),
-        sabor: document.getElementById('sabor').value.trim() || 'Sem sabor',
-        peso: document.getElementById('peso').value.trim(),
-        familia: document.getElementById('familia').value,
-        dataCompra: document.getElementById('dataCompra').value,
-        quantidade: parseInt(document.getElementById('quantidadeCompra').value),
-        custoUnitario: parseFloat(document.getElementById('valorUnitario').value),
-        valorTotal: parseFloat(document.getElementById('valorTotal').value),
-        valorSugerido: parseFloat(document.getElementById('valorSugerido').value) || null,
-        simulacao40: parseFloat(document.getElementById('simulacao40').value),
-        socio: document.getElementById('socio').value,
-        fornecedor: document.getElementById('fornecedor').value,
-        vendido: 0,
-        ativo: true,
-        dataCriacao: new Date().toISOString(),
-        imagemUrl: document.getElementById('imagemProduto').value.trim() || '',
-    };
-    
+
     try {
-        await window.addDoc(window.collection(window.db, 'lotes'), lote);
-        await window.addDoc(window.collection(window.db, 'compras'), {
+        const produtoNome = document.getElementById('nome').value.trim();
+        const marcaNome = document.getElementById('marca').value.trim();
+        const quantidadeCompra = parseInt(document.getElementById('quantidadeCompra').value);
+        const valorTotalCompra = converterNumero(document.getElementById('valorTotal').value);
+        const custoUnitario = quantidadeCompra > 0 ? valorTotalCompra / quantidadeCompra : 0;
+        const valorSugeridoInformado = converterNumero(document.getElementById('valorSugerido').value) || null;
+        const simulacao40 = custoUnitario * 1.4;
+        const imagemUrl = document.getElementById('imagemProduto')?.value.trim() || '';
+
+        const lote = {
+            produto: produtoNome,
+            marca: marcaNome,
+            sabor: document.getElementById('sabor').value.trim() || 'Sem sabor',
+            peso: document.getElementById('peso').value.trim(),
+            familia: document.getElementById('familia').value,
+            dataCompra: document.getElementById('dataCompra').value,
+            quantidade: quantidadeCompra,
+            custoUnitario,
+            valorTotal: valorTotalCompra,
+            valorSugerido: valorSugeridoInformado || simulacao40,
+            simulacao40,
+            vendido: 0,
+            ativo: true,
+            dataCriacao: new Date().toISOString(),
+            imagemUrl,
+        };
+
+        const loteRef = window.doc(window.collection(window.db, 'lotes'));
+        const compraRef = window.doc(window.collection(window.db, 'compras'));
+        const batch = window.writeBatch(window.db);
+
+        batch.set(loteRef, lote);
+        batch.set(compraRef, {
             ...lote,
+            loteId: loteRef.id,
             tipo: 'compra'
         });
-        
+        await batch.commit();
+
         mostrarNotificacao(`Lote registrado! ${lote.quantidade} un. a R$ ${lote.custoUnitario.toFixed(2)}`, 'sucesso');
         document.getElementById('compraForm').reset();
-        
+        definirDataCompraPadrao();
+        atualizarResumoCompra();
+        atualizarPreviewImagemProduto();
+
         carregarEstoqueLotes();
         carregarSelectProdutos();
-        
+        carregarProdutosCompraRapida();
+        carregarRelatorio();
+
     } catch (error) {
         console.error('Erro:', error);
         mostrarNotificacao(`Erro ao registrar compra: ${error.message}`, 'erro');
@@ -275,97 +792,267 @@ async function registrarCompra(event) {
 // ============================================================
 // VENDAS (FIFO - PRIMEIRO QUE ENTRA, PRIMEIRO QUE SAI)
 // ============================================================
+function configurarAtalhosVenda() {
+    document.querySelectorAll('[data-pagamento-rapido]').forEach(botao => {
+        botao.addEventListener('click', () => {
+            const pagamento = botao.dataset.pagamentoRapido;
+            const select = document.getElementById('pagamentoVenda');
+            if (!select || !pagamento) return;
+
+            select.value = pagamento;
+            toggleParcelas();
+            atualizarAtalhosPagamento();
+            atualizarTotalVendaPorPrecoUnitario();
+            calcularPreview();
+        });
+    });
+
+    document.querySelectorAll('[data-qty-step]').forEach(botao => {
+        botao.addEventListener('click', () => {
+            const passo = parseInt(botao.dataset.qtyStep) || 0;
+            const campo = document.getElementById('quantidadeVenda');
+            const atual = parseInt(campo?.value) || 1;
+            definirQuantidadeVenda(atual + passo);
+        });
+    });
+
+    document.querySelectorAll('[data-qty-preset]').forEach(botao => {
+        botao.addEventListener('click', () => {
+            definirQuantidadeVenda(parseInt(botao.dataset.qtyPreset) || 1);
+        });
+    });
+
+    atualizarAtalhosPagamento();
+    atualizarAtalhosQuantidade();
+    atualizarResumoVenda();
+}
+
+function definirQuantidadeVenda(valor) {
+    const campo = document.getElementById('quantidadeVenda');
+    if (!campo) return;
+
+    campo.value = String(Math.max(1, parseInt(valor) || 1));
+    atualizarAtalhosQuantidade();
+    atualizarTotalVendaPorPrecoUnitario();
+    atualizarCamposDesconto();
+    calcularPreview();
+}
+
+function atualizarAtalhosPagamento() {
+    const pagamentoAtual = document.getElementById('pagamentoVenda')?.value || 'Pix';
+    document.querySelectorAll('[data-pagamento-rapido]').forEach(botao => {
+        botao.classList.toggle('active', botao.dataset.pagamentoRapido === pagamentoAtual);
+    });
+}
+
+function atualizarAtalhosQuantidade() {
+    const quantidade = parseInt(document.getElementById('quantidadeVenda')?.value) || 1;
+    document.querySelectorAll('[data-qty-preset]').forEach(botao => {
+        botao.classList.toggle('active', parseInt(botao.dataset.qtyPreset) === quantidade);
+    });
+}
+
+function atualizarResumoVenda(dados = {}) {
+    const quantidade = parseInt(document.getElementById('quantidadeVenda')?.value) || 1;
+    const produtoSelecionado = obterProdutoSelecionadoVenda();
+    const precoUnitario = dados.precoUnitario ?? converterNumero(document.getElementById('precoVenda')?.value);
+    const pagamento = document.getElementById('pagamentoVenda')?.value || 'Pix';
+    const parcelas = parseInt(document.getElementById('parcelasVenda')?.value) || 1;
+    const { taxa, taxaLabel } = calcularTaxaPagamento(pagamento, parcelas);
+    const valoresVenda = dados.valoresVenda || calcularValoresVenda(precoUnitario * quantidade, taxa, repasseJurosAtivo());
+    const desconto = calcularDescontoVendaAtual();
+
+    atualizarTexto('vendaStatusResumo', produtoSelecionado ? `${produtoSelecionado.produto} x${quantidade}` : 'Pronta para venda');
+    atualizarTexto('resumoVendaUnitario', precoUnitario > 0 ? formatarMoeda(precoUnitario) : 'Pendente');
+    atualizarTexto(
+        'resumoVendaDesconto',
+        desconto.descontoTotal > 0.004 ? formatarMoeda(desconto.descontoTotal) : 'Sem desconto'
+    );
+    atualizarTexto(
+        'resumoVendaTaxa',
+        taxa > 0
+            ? (repasseJurosAtivo() ? `${taxaLabel} repassado` : formatarMoeda(valoresVenda.taxaValor))
+            : 'Sem taxa'
+    );
+
+    if (dados.lucroReal !== undefined) {
+        const lucroEl = document.getElementById('previewLucro');
+        if (lucroEl) lucroEl.classList.toggle('vermelho', dados.lucroReal < 0);
+    }
+}
+
 async function registrarVenda(event) {
     event.preventDefault();
-    
-    const produtoNome = document.getElementById('produtoVenda').value;
+
+    const produtoSelecionado = obterProdutoSelecionadoVenda();
     const quantidadeVenda = parseInt(document.getElementById('quantidadeVenda').value);
-    const precoVenda = parseFloat(document.getElementById('precoVenda').value);
-    
-    if (!produtoNome) {
+    const valorTotalInformado = converterNumero(document.getElementById('previewTotal').value);
+    const precoVendaInformado = converterNumero(document.getElementById('precoVenda').value);
+
+    if (!produtoSelecionado) {
         mostrarNotificacao('Selecione um produto!', 'erro');
         return;
     }
-    
+
+    if (!quantidadeVenda || quantidadeVenda <= 0) {
+        mostrarNotificacao('Informe uma quantidade válida!', 'erro');
+        return;
+    }
+
+    const valorBaseVenda = precoVendaInformado > 0
+        ? (precoVendaInformado * quantidadeVenda)
+        : valorTotalInformado;
+
+    if (!valorBaseVenda || valorBaseVenda <= 0) {
+        mostrarNotificacao('Informe o valor da venda.', 'erro');
+        return;
+    }
+
     try {
-        const q = window.query(
-            window.collection(window.db, 'lotes'),
-            window.where('produto', '==', produtoNome),
-            window.where('ativo', '==', true)
-        );
-        const snapshot = await window.getDocs(q);
-        
-        const lotesDisponiveis = [];
-        snapshot.forEach(doc => {
-            const l = doc.data();
-            const saldo = l.quantidade - l.vendido;
-            if (saldo > 0) {
-                lotesDisponiveis.push({
-                    id: doc.id,
-                    ...l,
-                    saldo: saldo
-                });
-            }
-        });
-        
-        lotesDisponiveis.sort((a, b) => new Date(a.dataCompra) - new Date(b.dataCompra));
-        
-        const totalDisponivel = lotesDisponiveis.reduce((acc, l) => acc + l.saldo, 0);
+        const candidatos = await buscarLotesDisponiveisPorProduto(produtoSelecionado);
+        const totalDisponivel = candidatos.reduce((acc, l) => acc + l.saldo, 0);
         if (totalDisponivel < quantidadeVenda) {
             throw new Error(`Estoque insuficiente! Disponível: ${totalDisponivel} unidades.`);
         }
-        
-        let quantidadeRestante = quantidadeVenda;
-        let custoTotal = 0;
-        const lotesUtilizados = [];
-        
-        for (const lote of lotesDisponiveis) {
-            if (quantidadeRestante <= 0) break;
-            
-            const usar = Math.min(quantidadeRestante, lote.saldo);
-            custoTotal += usar * lote.custoUnitario;
-            
-            lotesUtilizados.push({
-                loteId: lote.id,
-                quantidade: usar,
-                custoUnitario: lote.custoUnitario,
-                dataCompra: lote.dataCompra
-            });
-            
-            const novoVendido = lote.vendido + usar;
-            await window.updateDoc(window.doc(window.db, 'lotes', lote.id), {
-                vendido: novoVendido,
-                ativo: novoVendido < lote.quantidade
-            });
-            
-            quantidadeRestante -= usar;
-        }
-        
-        const venda = {
-            produto: produtoNome,
-            quantidade: quantidadeVenda,
-            precoUnitario: precoVenda,
-            valorTotal: precoVenda * quantidadeVenda,
-            custoTotal: custoTotal,
-            lucro: (precoVenda * quantidadeVenda) - custoTotal,
-            pagamento: document.getElementById('pagamentoVenda').value,
-            parcelas: parseInt(document.getElementById('parcelasVenda').value) || 1,
-            taxa: parseFloat(document.getElementById('taxaDisplay').value.replace('%', '').replace('-', '')) / 100 || 0,
-            valorLiquido: parseFloat(document.getElementById('previewLiquido').value.replace('R$ ', '').replace(',', '.')) || 0,
-            cliente: document.getElementById('clienteVenda').value || 'Cliente não identificado',
-            contato: document.getElementById('contatoVenda').value || '',
-            data: new Date().toISOString(),
-            vendedor: currentUser?.email,
-            lotesUtilizados: lotesUtilizados
-        };
-        
-        await window.addDoc(window.collection(window.db, 'vendas'), venda);
-        mostrarNotificacao(`Venda registrada! ${quantidadeVenda} un. | Total: R$ ${venda.valorTotal.toFixed(2)}`, 'sucesso');
+
+        const pagamento = document.getElementById('pagamentoVenda').value;
+        const parcelas = pagamento === 'Crédito' ? (parseInt(document.getElementById('parcelasVenda').value) || 1) : 1;
+        const { taxa } = calcularTaxaPagamento(pagamento, parcelas);
+        const repasseJuros = repasseJurosAtivo();
+        const valoresVenda = calcularValoresVenda(valorBaseVenda, taxa, repasseJuros);
+        const valorTotal = valoresVenda.valorTotal;
+        const totalCobradoCliente = valoresVenda.totalCobradoCliente;
+        const valorLiquido = valoresVenda.valorLiquido;
+        const taxaValorCalculada = valoresVenda.taxaValor;
+        const jurosRepassado = valoresVenda.jurosRepassado;
+        const precoUnitario = valorBaseVenda / quantidadeVenda;
+        const precoUnitarioCobrado = valorTotal / quantidadeVenda;
+        const precoReferenciaVenda = converterNumero(precoSugeridoAtualVenda);
+        const descontoUnitarioVenda = precoReferenciaVenda > 0
+            ? Math.max(0, precoReferenciaVenda - precoUnitario)
+            : Math.max(0, converterNumero(document.getElementById('descontoValor')?.value));
+        const descontoPercentualVenda = precoReferenciaVenda > 0
+            ? (descontoUnitarioVenda / precoReferenciaVenda) * 100
+            : Math.max(0, converterNumero(document.getElementById('descontoPercentual')?.value));
+        const descontoTotalVenda = descontoUnitarioVenda * quantidadeVenda;
+
+        const resultado = await window.runTransaction(window.db, async (transaction) => {
+            const lotesDisponiveis = [];
+
+            for (const candidato of candidatos) {
+                const loteSnap = await transaction.get(candidato.ref);
+                if (!loteSnap.exists()) continue;
+
+                const lote = loteSnap.data();
+                const saldo = (lote.quantidade || 0) - (lote.vendido || 0);
+                if (saldo > 0 && lote.ativo === true && loteCorrespondeProduto(lote, produtoSelecionado)) {
+                    lotesDisponiveis.push({
+                        id: loteSnap.id,
+                        ref: candidato.ref,
+                        ...lote,
+                        saldo
+                    });
+                }
+            }
+
+            lotesDisponiveis.sort((a, b) => new Date(a.dataCompra) - new Date(b.dataCompra));
+
+            const saldoAtual = lotesDisponiveis.reduce((acc, l) => acc + l.saldo, 0);
+            if (saldoAtual < quantidadeVenda) {
+                throw new Error(`Estoque insuficiente! Disponível agora: ${saldoAtual} unidades.`);
+            }
+
+            let quantidadeRestante = quantidadeVenda;
+            let custoTotal = 0;
+            const lotesUtilizados = [];
+
+            for (const lote of lotesDisponiveis) {
+                if (quantidadeRestante <= 0) break;
+
+                const usar = Math.min(quantidadeRestante, lote.saldo);
+                custoTotal += usar * lote.custoUnitario;
+
+                lotesUtilizados.push({
+                    loteId: lote.id,
+                    quantidade: usar,
+                    custoUnitario: lote.custoUnitario,
+                    dataCompra: lote.dataCompra
+                });
+
+                const novoVendido = (lote.vendido || 0) + usar;
+                transaction.update(lote.ref, {
+                    vendido: novoVendido,
+                    ativo: novoVendido < lote.quantidade
+                });
+
+                quantidadeRestante -= usar;
+            }
+
+            const taxaValor = taxaValorCalculada;
+            const venda = {
+                produto: produtoSelecionado.produto,
+                marca: produtoSelecionado.marca,
+                sabor: produtoSelecionado.sabor,
+                peso: produtoSelecionado.peso,
+                produtoChave: criarChaveProduto(
+                    produtoSelecionado.produto,
+                    produtoSelecionado.marca,
+                    produtoSelecionado.sabor,
+                    produtoSelecionado.peso
+                ),
+                quantidade: quantidadeVenda,
+                precoUnitario,
+                precoUnitarioCobrado,
+                precoReferencia: precoReferenciaVenda || null,
+                descontoValorUnitario: descontoUnitarioVenda,
+                descontoPercentual: descontoPercentualVenda,
+                descontoTotal: descontoTotalVenda,
+                valorBase: valorBaseVenda,
+                valorTotal,
+                totalCobradoCliente,
+                custoTotal,
+                lucroBruto: valorBaseVenda - custoTotal,
+                lucro: valorLiquido - custoTotal,
+                pagamento,
+                parcelas,
+                repasseJuros,
+                jurosRepassado,
+                taxa,
+                taxaValor,
+                valorLiquido,
+                cliente: document.getElementById('clienteVenda').value || 'Cliente não identificado',
+                contato: document.getElementById('contatoVenda').value || '',
+                data: new Date().toISOString(),
+                vendedor: currentUser?.email,
+                lotesUtilizados
+            };
+
+            const vendaRef = window.doc(window.collection(window.db, 'vendas'));
+            transaction.set(vendaRef, venda);
+            return venda;
+        });
+
+        const totalMensagem = resultado.repasseJuros
+            ? `Produto: R$ ${resultado.valorTotal.toFixed(2)} | Cobrar: R$ ${resultado.totalCobradoCliente.toFixed(2)}`
+            : `Total: R$ ${resultado.valorTotal.toFixed(2)}`;
+        mostrarNotificacao(`Venda registrada! ${quantidadeVenda} un. | ${totalMensagem}`, 'sucesso');
         document.getElementById('vendaForm').reset();
-        
+        document.getElementById('quantidadeVenda').value = '1';
+        document.getElementById('previewTotal').value = '0';
+        document.getElementById('previewLiquido').value = 'R$ 0,00';
+        document.getElementById('previewLucro').value = 'R$ 0,00';
+        precoSugeridoAtualVenda = null;
+        limparCamposDesconto();
+        toggleParcelas();
+        renderizarSelectVenda('');
+        atualizarAtalhosPagamento();
+        atualizarAtalhosQuantidade();
+        atualizarResumoVenda();
+
         carregarEstoqueLotes();
         carregarSelectProdutos();
-        
+        carregarRelatorio();
+
     } catch (error) {
         console.error('Erro:', error);
         mostrarNotificacao(`Erro ao registrar venda: ${error.message}`, 'erro');
@@ -377,57 +1064,482 @@ async function registrarVenda(event) {
 // ============================================================
 async function registrarPerda(event) {
     event.preventDefault();
-    
+
     const produtoId = document.getElementById('produtoPerda').value;
     const quantidade = parseInt(document.getElementById('quantidadePerda').value);
     const motivo = document.getElementById('motivoPerda').value;
-    
+
     if (!produtoId) {
         mostrarNotificacao('Selecione um produto!', 'erro');
         return;
     }
-    
+
     try {
         const docRef = window.doc(window.db, 'lotes', produtoId);
-        const docSnap = await window.getDoc(docRef);
-        const lote = docSnap.data();
-        const saldo = lote.quantidade - lote.vendido;
-        
-        if (saldo < quantidade) {
-            throw new Error(`Saldo insuficiente! Disponível: ${saldo} unidades.`);
-        }
-        
-        const perda = {
-            produto: lote.produto,
-            marca: lote.marca,
-            sabor: lote.sabor,
-            quantidade: quantidade,
-            valorUnitario: lote.custoUnitario,
-            valorTotal: lote.custoUnitario * quantidade,
-            motivo: motivo,
-            data: new Date().toISOString(),
-            registradoPor: currentUser?.email,
-            loteId: produtoId
-        };
-        
-        await window.addDoc(window.collection(window.db, 'perdas'), perda);
-        
-        const novoVendido = lote.vendido + quantidade;
-        await window.updateDoc(docRef, {
-            vendido: novoVendido,
-            ativo: novoVendido < lote.quantidade
+        await window.runTransaction(window.db, async (transaction) => {
+            const docSnap = await transaction.get(docRef);
+            if (!docSnap.exists()) {
+                throw new Error('Lote não encontrado.');
+            }
+
+            const lote = docSnap.data();
+            const saldo = (lote.quantidade || 0) - (lote.vendido || 0);
+
+            if (saldo < quantidade) {
+                throw new Error(`Saldo insuficiente! Disponível: ${saldo} unidades.`);
+            }
+
+            const perda = {
+                produto: lote.produto,
+                marca: lote.marca,
+                sabor: lote.sabor,
+                peso: lote.peso,
+                quantidade: quantidade,
+                valorUnitario: lote.custoUnitario,
+                valorTotal: lote.custoUnitario * quantidade,
+                motivo: motivo,
+                data: new Date().toISOString(),
+                registradoPor: currentUser?.email,
+                loteId: produtoId
+            };
+
+            const perdaRef = window.doc(window.collection(window.db, 'perdas'));
+            transaction.set(perdaRef, perda);
+
+            const novoVendido = (lote.vendido || 0) + quantidade;
+            transaction.update(docRef, {
+                vendido: novoVendido,
+                ativo: novoVendido < lote.quantidade
+            });
         });
-        
+
         mostrarNotificacao(`Perda registrada! ${quantidade} un. - ${motivo}`, 'aviso');
         document.getElementById('perdaForm').reset();
-        
+
         carregarEstoqueLotes();
         carregarSelectProdutos();
-        
+
     } catch (error) {
         mostrarNotificacao(`Erro ao registrar perda: ${error.message}`, 'erro');
     }
 }
+
+// ============================================================
+// DESPESAS
+// ============================================================
+function definirDataDespesaPadrao() {
+    const dataDespesa = document.getElementById('dataDespesa');
+    if (dataDespesa && !dataDespesa.value) {
+        dataDespesa.value = obterDataInputHoje();
+    }
+}
+
+function atualizarMensagemDespesa(mensagem = '', tipo = '') {
+    const messageDiv = document.getElementById('despesaMessage');
+    if (!messageDiv) return;
+
+    messageDiv.textContent = mensagem;
+    messageDiv.className = tipo ? `message ${tipo}` : 'message';
+}
+
+async function registrarDespesa(event) {
+    event.preventDefault();
+
+    const valor = converterNumero(document.getElementById('valorDespesa')?.value);
+    const descricao = document.getElementById('descricaoDespesa')?.value.trim();
+    const dataDespesa = document.getElementById('dataDespesa')?.value;
+
+    if (!dataDespesa) {
+        mostrarNotificacao('Informe a data da despesa.', 'erro');
+        return;
+    }
+
+    if (!descricao) {
+        mostrarNotificacao('Informe a descrição da despesa.', 'erro');
+        return;
+    }
+
+    if (!valor || valor <= 0) {
+        mostrarNotificacao('Informe um valor válido para a despesa.', 'erro');
+        return;
+    }
+
+    const despesa = {
+        dataDespesa,
+        data: dataDespesa,
+        descricao,
+        categoria: document.getElementById('categoriaDespesa')?.value || 'Outros',
+        valor,
+        pagamento: document.getElementById('pagamentoDespesa')?.value || 'Pix',
+        responsavel: document.getElementById('responsavelDespesa')?.value || 'Loja',
+        observacao: document.getElementById('observacaoDespesa')?.value.trim() || '',
+        registradoPor: currentUser?.email || '',
+        dataCriacao: new Date().toISOString()
+    };
+
+    try {
+        await window.addDoc(window.collection(window.db, 'despesas'), despesa);
+        mostrarNotificacao(`Despesa registrada: ${formatarMoeda(valor)}`, 'sucesso');
+        atualizarMensagemDespesa('Despesa registrada com sucesso.', 'sucesso');
+
+        document.getElementById('despesaForm').reset();
+        definirDataDespesaPadrao();
+        await carregarDespesas();
+        await carregarRelatorio();
+    } catch (error) {
+        console.error('Erro ao registrar despesa:', error);
+        mostrarNotificacao(`Erro ao registrar despesa: ${error.message}`, 'erro');
+        atualizarMensagemDespesa(`Erro: ${error.message}`, 'erro');
+    }
+}
+
+async function carregarDespesas() {
+    const listaDiv = document.getElementById('despesasLista');
+    const resumoDiv = document.getElementById('despesasResumo');
+    if (!listaDiv) return;
+
+    listaDiv.innerHTML = '<p>Carregando despesas...</p>';
+
+    try {
+        const snapshot = await window.getDocs(window.collection(window.db, 'despesas'));
+        const despesas = [];
+
+        snapshot.forEach(docSnap => {
+            const despesa = docSnap.data();
+            despesas.push({
+                id: docSnap.id,
+                ...despesa,
+                valor: converterNumero(despesa.valor),
+                dataOrdenacao: (converterData(despesa.dataDespesa || despesa.data || despesa.dataCriacao) || new Date(0)).getTime()
+            });
+        });
+
+        despesas.sort((a, b) => b.dataOrdenacao - a.dataOrdenacao);
+
+        const inicioMes = new Date();
+        inicioMes.setDate(1);
+        inicioMes.setHours(0, 0, 0, 0);
+
+        const totalGeral = despesas.reduce((acc, d) => acc + d.valor, 0);
+        const totalMes = despesas
+            .filter(d => (converterData(d.dataDespesa || d.data || d.dataCriacao) || new Date(0)) >= inicioMes)
+            .reduce((acc, d) => acc + d.valor, 0);
+
+        if (resumoDiv) resumoDiv.textContent = `${formatarMoeda(totalMes)} este mês`;
+
+        if (despesas.length === 0) {
+            listaDiv.innerHTML = '<p>Nenhuma despesa registrada.</p>';
+            return;
+        }
+
+        const resumoHtml = `
+            <div class="expense-summary">
+                <div class="mini-stat">
+                    <label>Este mês</label>
+                    <strong>${formatarMoeda(totalMes)}</strong>
+                </div>
+                <div class="mini-stat">
+                    <label>Total geral</label>
+                    <strong>${formatarMoeda(totalGeral)}</strong>
+                </div>
+                <div class="mini-stat">
+                    <label>Registros</label>
+                    <strong>${despesas.length}</strong>
+                </div>
+            </div>
+        `;
+
+        const listaHtml = despesas.slice(0, 30).map(d => `
+            <div class="compact-item">
+                <div>
+                    <strong>${escaparHtml(d.descricao)}</strong>
+                    <div class="meta">
+                        ${formatarDataCurta(d.dataDespesa || d.data || d.dataCriacao)}
+                        · ${escaparHtml(d.categoria || 'Outros')}
+                        · ${escaparHtml(d.pagamento || '-')}
+                        · ${escaparHtml(d.responsavel || 'Loja')}
+                    </div>
+                    ${d.observacao ? `<div class="meta">${escaparHtml(d.observacao)}</div>` : ''}
+                </div>
+                <div class="compact-actions">
+                    <span class="valor">${formatarMoeda(d.valor)}</span>
+                    <button type="button" class="btn-danger" onclick="window.excluirDespesa('${d.id}')">
+                        <i class="fas fa-trash"></i> Excluir
+                    </button>
+                </div>
+            </div>
+        `).join('');
+
+        listaDiv.innerHTML = `${resumoHtml}<div class="compact-list">${listaHtml}</div>`;
+    } catch (error) {
+        console.error('Erro ao carregar despesas:', error);
+        listaDiv.innerHTML = `Erro ao carregar despesas: ${error.message}`;
+    }
+}
+
+window.excluirDespesa = async function(despesaId) {
+    if (!confirm('Deseja excluir esta despesa?')) {
+        return;
+    }
+
+    try {
+        await window.deleteDoc(window.doc(window.db, 'despesas', despesaId));
+        mostrarNotificacao('Despesa excluída.', 'aviso');
+        await carregarDespesas();
+        await carregarRelatorio();
+    } catch (error) {
+        console.error('Erro ao excluir despesa:', error);
+        mostrarNotificacao(`Erro ao excluir despesa: ${error.message}`, 'erro');
+    }
+};
+
+// ============================================================
+// CAIXA - AJUSTES DE SALDO REAL
+// ============================================================
+function definirDataCaixaPadrao() {
+    const dataCaixa = document.getElementById('dataCaixa');
+    if (dataCaixa && !dataCaixa.value) {
+        dataCaixa.value = obterDataInputHoje();
+    }
+}
+
+async function calcularPosicaoFinanceiraGeral() {
+    const [
+        vendasSnapshot,
+        comprasSnapshot,
+        despesasSnapshot,
+        lotesSnapshot
+    ] = await Promise.all([
+        window.getDocs(window.collection(window.db, 'vendas')),
+        window.getDocs(window.collection(window.db, 'compras')),
+        window.getDocs(window.collection(window.db, 'despesas')),
+        window.getDocs(window.collection(window.db, 'lotes'))
+    ]);
+
+    let caixaSnapshot = null;
+    try {
+        caixaSnapshot = await window.getDocs(window.collection(window.db, 'caixa'));
+    } catch (error) {
+        console.warn('Não foi possível carregar ajustes de caixa:', error);
+    }
+
+    let faturamentoLiquidoGeral = 0;
+    let totalComprasGeral = 0;
+    let totalDespesasGeral = 0;
+    let entradasCaixaGeral = 0;
+    let saidasCaixaGeral = 0;
+    let valorEstoque = 0;
+    let totalUnidadesEstoque = 0;
+    let lotesAtivos = 0;
+
+    vendasSnapshot.forEach(docSnap => {
+        const venda = docSnap.data();
+        if (venda.cancelada === true) return;
+        const valorLiquido = venda.valorLiquido !== undefined
+            ? converterNumero(venda.valorLiquido)
+            : converterNumero(venda.valorTotal);
+        faturamentoLiquidoGeral += valorLiquido;
+    });
+
+    comprasSnapshot.forEach(docSnap => {
+        totalComprasGeral += converterNumero(docSnap.data().valorTotal);
+    });
+
+    despesasSnapshot.forEach(docSnap => {
+        totalDespesasGeral += converterNumero(docSnap.data().valor);
+    });
+
+    caixaSnapshot?.forEach(docSnap => {
+        const movimento = docSnap.data();
+        const valor = converterNumero(movimento.valor);
+        if (movimento.tipo === 'saida') {
+            saidasCaixaGeral += valor;
+        } else {
+            entradasCaixaGeral += valor;
+        }
+    });
+
+    lotesSnapshot.forEach(docSnap => {
+        const lote = docSnap.data();
+        const saldo = converterNumero(lote.quantidade) - converterNumero(lote.vendido);
+        if (saldo > 0) {
+            valorEstoque += saldo * converterNumero(lote.custoUnitario);
+            totalUnidadesEstoque += saldo;
+            lotesAtivos++;
+        }
+    });
+
+    const ajustesCaixaGeral = entradasCaixaGeral - saidasCaixaGeral;
+    const saldoCaixaEstimado = faturamentoLiquidoGeral - totalComprasGeral - totalDespesasGeral + ajustesCaixaGeral;
+    const valorRealEstimado = valorEstoque + saldoCaixaEstimado;
+
+    return {
+        faturamentoLiquidoGeral,
+        totalComprasGeral,
+        totalDespesasGeral,
+        entradasCaixaGeral,
+        saidasCaixaGeral,
+        ajustesCaixaGeral,
+        saldoCaixaEstimado,
+        valorEstoque,
+        valorRealEstimado,
+        totalUnidadesEstoque,
+        lotesAtivos
+    };
+}
+
+async function registrarMovimentoCaixa(event) {
+    event.preventDefault();
+
+    const dataCaixa = document.getElementById('dataCaixa')?.value;
+    const tipo = document.getElementById('tipoCaixa')?.value === 'saida' ? 'saida' : 'entrada';
+    const categoria = document.getElementById('categoriaCaixa')?.value || 'Ajuste';
+    const valor = converterNumero(document.getElementById('valorCaixa')?.value);
+    const descricaoInformada = document.getElementById('descricaoCaixa')?.value.trim();
+
+    if (!dataCaixa) {
+        mostrarNotificacao('Informe a data do movimento.', 'erro');
+        return;
+    }
+
+    if (!valor || valor <= 0) {
+        mostrarNotificacao('Informe um valor válido para o caixa.', 'erro');
+        return;
+    }
+
+    const movimento = {
+        dataCaixa,
+        data: dataCaixa,
+        tipo,
+        categoria,
+        valor,
+        descricao: descricaoInformada || `${categoria} de caixa`,
+        registradoPor: currentUser?.email || '',
+        dataCriacao: new Date().toISOString()
+    };
+
+    try {
+        await window.addDoc(window.collection(window.db, 'caixa'), movimento);
+        mostrarNotificacao(`${tipo === 'saida' ? 'Saída' : 'Entrada'} registrada: ${formatarMoeda(valor)}`, 'sucesso');
+
+        document.getElementById('caixaForm').reset();
+        definirDataCaixaPadrao();
+        await carregarCaixa();
+        await carregarRelatorio();
+    } catch (error) {
+        console.error('Erro ao registrar movimento de caixa:', error);
+        mostrarNotificacao(`Erro ao registrar caixa: ${error.message}`, 'erro');
+    }
+}
+
+async function carregarCaixa() {
+    const listaDiv = document.getElementById('caixaLista');
+    const resumoDiv = document.getElementById('caixaResumo');
+    if (!listaDiv) return;
+
+    listaDiv.innerHTML = '<p>Carregando caixa...</p>';
+
+    try {
+        const posicao = await calcularPosicaoFinanceiraGeral();
+        let caixaSnapshot = null;
+
+        try {
+            caixaSnapshot = await window.getDocs(window.collection(window.db, 'caixa'));
+        } catch (error) {
+            console.warn('Não foi possível carregar movimentos de caixa:', error);
+        }
+
+        const movimentos = [];
+        caixaSnapshot?.forEach(docSnap => {
+            const movimento = docSnap.data();
+            movimentos.push({
+                id: docSnap.id,
+                ...movimento,
+                valor: converterNumero(movimento.valor),
+                tipo: movimento.tipo === 'saida' ? 'saida' : 'entrada',
+                dataOrdenacao: (converterData(movimento.dataCaixa || movimento.data || movimento.dataCriacao) || new Date(0)).getTime()
+            });
+        });
+
+        movimentos.sort((a, b) => b.dataOrdenacao - a.dataOrdenacao);
+
+        if (resumoDiv) {
+            resumoDiv.textContent = formatarMoeda(posicao.saldoCaixaEstimado);
+        }
+
+        const resumoHtml = `
+            <div class="expense-summary">
+                <div class="mini-stat">
+                    <label>Caixa estimado</label>
+                    <strong>${formatarMoeda(posicao.saldoCaixaEstimado)}</strong>
+                </div>
+                <div class="mini-stat">
+                    <label>Estoque atual</label>
+                    <strong>${formatarMoeda(posicao.valorEstoque)}</strong>
+                </div>
+                <div class="mini-stat">
+                    <label>Valor real</label>
+                    <strong>${formatarMoeda(posicao.valorRealEstimado)}</strong>
+                </div>
+                <div class="mini-stat">
+                    <label>Ajustes manuais</label>
+                    <strong>${formatarMoeda(posicao.ajustesCaixaGeral)}</strong>
+                </div>
+            </div>
+        `;
+
+        if (movimentos.length === 0) {
+            const mensagem = caixaSnapshot
+                ? 'Nenhum movimento manual de caixa registrado.'
+                : 'Não foi possível carregar movimentos manuais de caixa agora.';
+            listaDiv.innerHTML = `${resumoHtml}<p>${mensagem}</p>`;
+            return;
+        }
+
+        const listaHtml = movimentos.slice(0, 30).map(movimento => {
+            const isSaida = movimento.tipo === 'saida';
+            return `
+                <div class="compact-item">
+                    <div>
+                        <strong>${escaparHtml(movimento.descricao || movimento.categoria || 'Movimento de caixa')}</strong>
+                        <div class="meta">
+                            ${formatarDataCurta(movimento.dataCaixa || movimento.data || movimento.dataCriacao)}
+                            · ${escaparHtml(movimento.categoria || 'Ajuste')}
+                            · ${isSaida ? 'Saída' : 'Entrada'}
+                        </div>
+                    </div>
+                    <div class="compact-actions">
+                        <span class="valor ${isSaida ? 'vermelho' : ''}">${isSaida ? '-' : '+'} ${formatarMoeda(movimento.valor)}</span>
+                        <button type="button" class="btn-danger" onclick="window.excluirMovimentoCaixa('${movimento.id}')">
+                            <i class="fas fa-trash"></i> Excluir
+                        </button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        listaDiv.innerHTML = `${resumoHtml}<div class="compact-list">${listaHtml}</div>`;
+    } catch (error) {
+        console.error('Erro ao carregar caixa:', error);
+        listaDiv.innerHTML = `Erro ao carregar caixa: ${error.message}`;
+    }
+}
+
+window.excluirMovimentoCaixa = async function(movimentoId) {
+    if (!confirm('Deseja excluir este movimento de caixa?')) {
+        return;
+    }
+
+    try {
+        await window.deleteDoc(window.doc(window.db, 'caixa', movimentoId));
+        mostrarNotificacao('Movimento de caixa excluído.', 'aviso');
+        await carregarCaixa();
+        await carregarRelatorio();
+    } catch (error) {
+        console.error('Erro ao excluir movimento de caixa:', error);
+        mostrarNotificacao(`Erro ao excluir caixa: ${error.message}`, 'erro');
+    }
+};
 
 // ============================================================
 // PARCELAS - MOSTRAR/ESCONDER
@@ -435,14 +1547,306 @@ async function registrarPerda(event) {
 function toggleParcelas() {
     const pagamento = document.getElementById('pagamentoVenda').value;
     const parcelasRow = document.getElementById('parcelasRow');
+    const repasseRow = document.getElementById('repasseRow');
+    const repasseJuros = document.getElementById('repasseJuros');
+
     if (pagamento === 'Crédito') {
-        parcelasRow.style.display = 'flex';
+        parcelasRow.style.display = 'block';
     } else {
         parcelasRow.style.display = 'none';
         document.getElementById('parcelasVenda').value = '1';
-        document.getElementById('taxaDisplay').value = '0%';
     }
+
+    if (pagamento === 'Crédito' || pagamento === 'Débito') {
+        if (repasseRow) repasseRow.style.display = 'block';
+    } else {
+        if (repasseRow) repasseRow.style.display = 'none';
+        if (repasseJuros) repasseJuros.checked = false;
+    }
+
+    atualizarResumoVenda();
     calcularPreview();
+}
+
+function repasseJurosAtivo() {
+    const pagamento = document.getElementById('pagamentoVenda')?.value;
+    const repasse = document.getElementById('repasseJuros')?.checked === true;
+    return repasse && (pagamento === 'Crédito' || pagamento === 'Débito');
+}
+
+function calcularValoresVenda(valorBase, taxa, repasseJuros) {
+    const base = Math.max(0, converterNumero(valorBase));
+    const taxaAplicada = Math.max(0, converterNumero(taxa));
+
+    if (!base || !taxaAplicada) {
+        return {
+            valorBase: base,
+            valorTotal: base,
+            totalCobradoCliente: base,
+            valorLiquido: base,
+            taxaValor: 0,
+            jurosRepassado: 0
+        };
+    }
+
+    if (repasseJuros) {
+        const totalCobradoCliente = base / (1 - taxaAplicada);
+        const taxaValor = totalCobradoCliente * taxaAplicada;
+        return {
+            valorBase: base,
+            valorTotal: base,
+            totalCobradoCliente,
+            valorLiquido: base,
+            taxaValor,
+            jurosRepassado: totalCobradoCliente - base
+        };
+    }
+
+    const taxaValor = base * taxaAplicada;
+    return {
+        valorBase: base,
+        valorTotal: base,
+        totalCobradoCliente: base,
+        valorLiquido: base - taxaValor,
+        taxaValor,
+        jurosRepassado: 0
+    };
+}
+
+// ============================================================
+// DESCONTOS DA VENDA
+// ============================================================
+function obterCamposDesconto() {
+    return {
+        area: document.getElementById('descontoArea'),
+        valor: document.getElementById('descontoValor'),
+        percentual: document.getElementById('descontoPercentual'),
+        resumo: document.getElementById('descontoResumo'),
+        historico: document.getElementById('historicoDescontos')
+    };
+}
+
+function atualizarTotalVendaPorPrecoUnitario() {
+    const precoUnitario = converterNumero(document.getElementById('precoVenda')?.value);
+    const quantidade = parseInt(document.getElementById('quantidadeVenda')?.value) || 1;
+    const pagamento = document.getElementById('pagamentoVenda')?.value;
+    const parcelas = parseInt(document.getElementById('parcelasVenda')?.value) || 1;
+    const { taxa } = calcularTaxaPagamento(pagamento, parcelas);
+    const valores = calcularValoresVenda(precoUnitario * quantidade, taxa, repasseJurosAtivo());
+    const previewTotal = document.getElementById('previewTotal');
+
+    if (previewTotal) {
+        previewTotal.value = valores.totalCobradoCliente.toFixed(2).replace('.', ',');
+    }
+}
+
+function calcularDescontoVendaAtual() {
+    const referencia = converterNumero(precoSugeridoAtualVenda);
+    const precoAtual = converterNumero(document.getElementById('precoVenda')?.value);
+    const quantidade = parseInt(document.getElementById('quantidadeVenda')?.value) || 1;
+    const descontoUnitario = referencia > 0 ? Math.max(0, referencia - precoAtual) : 0;
+    const descontoPercentual = referencia > 0 ? (descontoUnitario / referencia) * 100 : 0;
+
+    return {
+        referencia,
+        precoAtual,
+        quantidade,
+        descontoUnitario,
+        descontoPercentual,
+        descontoTotal: descontoUnitario * quantidade
+    };
+}
+
+function atualizarResumoDesconto(dados = calcularDescontoVendaAtual()) {
+    const { resumo } = obterCamposDesconto();
+    if (!resumo) return;
+
+    if (!dados.referencia) {
+        resumo.textContent = 'Preço sugerido pendente';
+        return;
+    }
+
+    if (dados.descontoUnitario <= 0.004) {
+        resumo.textContent = 'Sem desconto';
+        return;
+    }
+
+    resumo.textContent = `${formatarMoeda(dados.descontoTotal)} no total`;
+}
+
+function limparCamposDesconto() {
+    const campos = obterCamposDesconto();
+    if (campos.valor) campos.valor.value = '';
+    if (campos.percentual) campos.percentual.value = '';
+    if (campos.resumo) campos.resumo.textContent = 'Sem desconto';
+    if (campos.historico) campos.historico.innerHTML = '';
+    if (campos.area) campos.area.style.display = 'none';
+}
+
+function atualizarCamposDesconto() {
+    if (bloqueandoAtualizacaoDesconto) return;
+
+    const campos = obterCamposDesconto();
+    if (!campos.area) return;
+
+    const dados = calcularDescontoVendaAtual();
+
+    if (!dados.referencia) {
+        if (campos.valor) campos.valor.value = '';
+        if (campos.percentual) campos.percentual.value = '';
+        atualizarResumoDesconto(dados);
+        return;
+    }
+
+    bloqueandoAtualizacaoDesconto = true;
+    if (campos.valor) {
+        campos.valor.value = dados.descontoUnitario > 0.004
+            ? dados.descontoUnitario.toFixed(2).replace('.', ',')
+            : '';
+    }
+    if (campos.percentual) {
+        campos.percentual.value = dados.descontoPercentual > 0.004
+            ? dados.descontoPercentual.toFixed(2).replace('.', ',')
+            : '';
+    }
+    bloqueandoAtualizacaoDesconto = false;
+
+    atualizarResumoDesconto(dados);
+}
+
+function aplicarDescontoPorValor() {
+    if (bloqueandoAtualizacaoDesconto) return;
+
+    const campos = obterCamposDesconto();
+    const referencia = converterNumero(precoSugeridoAtualVenda);
+    if (!referencia) {
+        atualizarResumoDesconto();
+        return;
+    }
+
+    const desconto = Math.min(referencia, Math.max(0, converterNumero(campos.valor?.value)));
+    const percentual = (desconto / referencia) * 100;
+    const novoPreco = Math.max(0, referencia - desconto);
+
+    bloqueandoAtualizacaoDesconto = true;
+    document.getElementById('precoVenda').value = novoPreco.toFixed(2).replace('.', ',');
+    if (campos.percentual) campos.percentual.value = desconto > 0 ? percentual.toFixed(2).replace('.', ',') : '';
+    bloqueandoAtualizacaoDesconto = false;
+
+    atualizarTotalVendaPorPrecoUnitario();
+    atualizarResumoDesconto(calcularDescontoVendaAtual());
+    calcularPreview();
+}
+
+function aplicarDescontoPorPercentual() {
+    if (bloqueandoAtualizacaoDesconto) return;
+
+    const campos = obterCamposDesconto();
+    const referencia = converterNumero(precoSugeridoAtualVenda);
+    if (!referencia) {
+        atualizarResumoDesconto();
+        return;
+    }
+
+    const percentual = Math.min(100, Math.max(0, converterNumero(campos.percentual?.value)));
+    const desconto = referencia * (percentual / 100);
+    const novoPreco = Math.max(0, referencia - desconto);
+
+    bloqueandoAtualizacaoDesconto = true;
+    document.getElementById('precoVenda').value = novoPreco.toFixed(2).replace('.', ',');
+    if (campos.valor) campos.valor.value = desconto > 0 ? desconto.toFixed(2).replace('.', ',') : '';
+    bloqueandoAtualizacaoDesconto = false;
+
+    atualizarTotalVendaPorPrecoUnitario();
+    atualizarResumoDesconto(calcularDescontoVendaAtual());
+    calcularPreview();
+}
+
+async function carregarHistoricoDescontos(produtoSelecionado, precoReferencia) {
+    const { historico } = obterCamposDesconto();
+    if (!historico || !produtoSelecionado) return;
+
+    historico.innerHTML = '<p>Carregando histórico...</p>';
+
+    try {
+        const snapshot = await window.getDocs(window.collection(window.db, 'vendas'));
+        const vendas = [];
+
+        snapshot.forEach(docSnap => {
+            const venda = docSnap.data();
+            if (venda.cancelada === true || !vendaCorrespondeProduto(venda, produtoSelecionado)) return;
+
+            const quantidade = converterNumero(venda.quantidade) || 1;
+            const valorTotal = converterNumero(venda.valorTotal);
+            const precoUnitario = converterNumero(venda.precoUnitario) || (quantidade > 0 ? valorTotal / quantidade : 0);
+            if (!precoUnitario) return;
+
+            const referencia = converterNumero(venda.precoReferencia) || converterNumero(precoReferencia);
+            const descontoUnitarioSalvo = converterNumero(venda.descontoValorUnitario);
+            const descontoUnitario = descontoUnitarioSalvo || (referencia > 0 ? Math.max(0, referencia - precoUnitario) : 0);
+            const descontoPercentualSalvo = converterNumero(venda.descontoPercentual);
+            const descontoPercentual = descontoPercentualSalvo || (referencia > 0 ? (descontoUnitario / referencia) * 100 : 0);
+            const dataVenda = converterData(venda.data) || new Date(0);
+
+            vendas.push({
+                data: venda.data,
+                timestamp: dataVenda.getTime(),
+                precoUnitario,
+                descontoUnitario,
+                descontoPercentual,
+                pagamento: normalizarFormaPagamento(venda.pagamento) || '-',
+                cliente: venda.cliente || ''
+            });
+        });
+
+        vendas.sort((a, b) => b.timestamp - a.timestamp);
+
+        if (vendas.length === 0) {
+            historico.innerHTML = '<p>Nenhuma venda anterior desse produto.</p>';
+            return;
+        }
+
+        const ultimas = vendas.slice(0, 5);
+        const vendasComDesconto = vendas.filter(v => v.descontoUnitario > 0.004);
+        const mediaPreco = vendas.reduce((acc, v) => acc + v.precoUnitario, 0) / vendas.length;
+        const maiorDesconto = vendasComDesconto.length
+            ? Math.max(...vendasComDesconto.map(v => v.descontoUnitario))
+            : 0;
+
+        const resumoHtml = `
+            <div class="history-summary">
+                <div class="mini-stat">
+                    <label>Último preço</label>
+                    <strong>${formatarMoeda(ultimas[0].precoUnitario)}</strong>
+                </div>
+                <div class="mini-stat">
+                    <label>Média</label>
+                    <strong>${formatarMoeda(mediaPreco)}</strong>
+                </div>
+                <div class="mini-stat">
+                    <label>Maior desconto</label>
+                    <strong>${formatarMoeda(maiorDesconto)}</strong>
+                </div>
+            </div>
+        `;
+
+        const listaHtml = ultimas.map(v => `
+            <div class="compact-item">
+                <div>
+                    <strong>${formatarDataCurta(v.data)} - ${formatarMoeda(v.precoUnitario)}</strong>
+                    <div class="meta">
+                        ${escaparHtml(v.pagamento)}
+                        ${v.descontoUnitario > 0.004 ? ` · desconto ${formatarMoeda(v.descontoUnitario)} (${formatarPercentual(v.descontoPercentual)})` : ' · sem desconto'}
+                    </div>
+                </div>
+            </div>
+        `).join('');
+
+        historico.innerHTML = `${resumoHtml}<div class="compact-list">${listaHtml}</div>`;
+    } catch (error) {
+        console.error('Erro ao carregar histórico de descontos:', error);
+        historico.innerHTML = '<p>Não foi possível carregar o histórico.</p>';
+    }
 }
 
 // ============================================================
@@ -452,48 +1856,34 @@ async function calcularPreview() {
     const pagamento = document.getElementById('pagamentoVenda').value;
     const quantidade = parseInt(document.getElementById('quantidadeVenda').value) || 1;
     const parcelas = parseInt(document.getElementById('parcelasVenda').value) || 1;
-    const produtoNome = document.getElementById('produtoVenda').value;
-    
-    const valorTotal = parseFloat(document.getElementById('previewTotal').value) || 0;
-    
-    let taxa = 0;
-    let taxaLabel = '0%';
-    
-    if (pagamento === 'Pix' || pagamento === 'Dinheiro') {
-        taxa = 0;
-        taxaLabel = '0%';
-    } else if (pagamento === 'Débito') {
-        taxa = TAXAS_MAQUINETA.debito;
-        taxaLabel = '-0,57%';
-    } else if (pagamento === 'Crédito') {
-        const key = `credito_${parcelas}x`;
-        taxa = TAXAS_MAQUINETA[key] || 0;
-        taxaLabel = `-${(taxa * 100).toFixed(2)}%`;
+    const produtoSelecionado = obterProdutoSelecionadoVenda();
+    const precoUnitario = converterNumero(document.getElementById('precoVenda')?.value);
+
+    const { taxa, taxaLabel } = calcularTaxaPagamento(pagamento, parcelas);
+    const valoresVenda = calcularValoresVenda(precoUnitario * quantidade, taxa, repasseJurosAtivo());
+    const valorTotal = valoresVenda.totalCobradoCliente;
+    const valorLiquido = valoresVenda.valorLiquido;
+    const taxaDisplayLabel = taxa > 0 && repasseJurosAtivo()
+        ? `${taxaLabel} repassado`
+        : (taxa > 0 ? `-${taxaLabel}` : taxaLabel);
+
+    const previewTotal = document.getElementById('previewTotal');
+    if (previewTotal && document.activeElement !== previewTotal) {
+        previewTotal.value = valorTotal.toFixed(2).replace('.', ',');
     }
-    
-    const valorLiquido = valorTotal * (1 - taxa);
-    
+
     let custoUnitarioReal = 0;
-    if (produtoNome) {
+    if (produtoSelecionado) {
         try {
-            const q = window.query(
-                window.collection(window.db, 'lotes'),
-                window.where('produto', '==', produtoNome),
-                window.where('ativo', '==', true)
-            );
-            const snapshot = await window.getDocs(q);
-            
+            const lotes = await buscarLotesDisponiveisPorProduto(produtoSelecionado);
+
             let totalCusto = 0;
             let totalUnidades = 0;
-            snapshot.forEach(doc => {
-                const l = doc.data();
-                const saldo = l.quantidade - l.vendido;
-                if (saldo > 0) {
-                    totalCusto += saldo * l.custoUnitario;
-                    totalUnidades += saldo;
-                }
+            lotes.forEach(lote => {
+                totalCusto += lote.saldo * lote.custoUnitario;
+                totalUnidades += lote.saldo;
             });
-            
+
             if (totalUnidades > 0) {
                 custoUnitarioReal = totalCusto / totalUnidades;
             }
@@ -501,69 +1891,62 @@ async function calcularPreview() {
             console.error('Erro ao buscar custo real:', error);
         }
     }
-    
+
     const custoTotalReal = custoUnitarioReal * quantidade;
     const lucroReal = valorLiquido - custoTotalReal;
-    
-    document.getElementById('taxaDisplay').value = taxaLabel;
-    document.getElementById('previewLiquido').value = `R$ ${valorLiquido.toFixed(2)}`;
-    document.getElementById('previewLucro').value = `R$ ${lucroReal.toFixed(2)}`;
-    
-    const precoUnitario = quantidade > 0 ? valorTotal / quantidade : 0;
-    document.getElementById('precoVenda').value = precoUnitario.toFixed(2);
+
+    document.getElementById('taxaDisplay').value = taxaDisplayLabel;
+    document.getElementById('previewLiquido').value = formatarMoeda(valorLiquido);
+    document.getElementById('previewLucro').value = formatarMoeda(lucroReal);
+    atualizarAtalhosQuantidade();
+    atualizarAtalhosPagamento();
+    atualizarResumoVenda({ precoUnitario, valoresVenda, lucroReal });
+
 }
 
 // ============================================================
 // BUSCAR INFORMAÇÕES DO PRODUTO PARA EXIBIÇÃO
 // ============================================================
 async function buscarInfoProduto() {
-    const produtoNome = document.getElementById('produtoVenda').value;
+    const produtoSelecionado = obterProdutoSelecionadoVenda();
     const infoDiv = document.getElementById('infoProduto');
-    
-    if (!produtoNome) {
+
+    if (!produtoSelecionado) {
         infoDiv.style.display = 'none';
         return;
     }
-    
+
     try {
-        const q = window.query(
-            window.collection(window.db, 'lotes'),
-            window.where('produto', '==', produtoNome),
-            window.where('ativo', '==', true)
-        );
-        const snapshot = await window.getDocs(q);
-        
+        const lotes = await buscarLotesDisponiveisPorProduto(produtoSelecionado);
+
         let totalCusto = 0;
         let totalUnidades = 0;
         let valorSugerido = null;
-        
-        snapshot.forEach(doc => {
-            const l = doc.data();
-            const saldo = l.quantidade - l.vendido;
-            if (saldo > 0) {
-                totalCusto += saldo * l.custoUnitario;
-                totalUnidades += saldo;
-                if (l.valorSugerido) {
-                    valorSugerido = l.valorSugerido;
-                }
+
+        lotes.forEach(lote => {
+            totalCusto += lote.saldo * lote.custoUnitario;
+            totalUnidades += lote.saldo;
+            if (lote.valorSugerido) {
+                valorSugerido = lote.valorSugerido;
             }
         });
-        
+
         if (totalUnidades === 0) {
             infoDiv.style.display = 'none';
             return;
         }
-        
+
         const custoMedio = totalCusto / totalUnidades;
         const margemBruta = valorSugerido ? ((valorSugerido - custoMedio) / valorSugerido * 100) : 0;
-        
-        document.getElementById('custoExibicao').textContent = `R$ ${custoMedio.toFixed(2)}`;
-        document.getElementById('sugeridoExibicao').textContent = valorSugerido ? `R$ ${valorSugerido.toFixed(2)}` : '⚠️ Não definido';
-        document.getElementById('margemExibicao').textContent = valorSugerido ? `${margemBruta.toFixed(1)}%` : '⚠️ Defina o preço';
+
+        document.getElementById('estoqueExibicao').textContent = `${totalUnidades} un.`;
+        document.getElementById('custoExibicao').textContent = formatarMoeda(custoMedio);
+        document.getElementById('sugeridoExibicao').textContent = valorSugerido ? formatarMoeda(valorSugerido) : 'Não definido';
+        document.getElementById('margemExibicao').textContent = valorSugerido ? `${margemBruta.toFixed(1).replace('.', ',')}%` : 'Defina o preço';
         document.getElementById('margemExibicao').style.color = margemBruta > 40 ? '#4caf50' : margemBruta > 20 ? '#ff9800' : '#f44336';
-        
+
         infoDiv.style.display = 'block';
-        
+
     } catch (error) {
         console.error('Erro ao buscar informações do produto:', error);
         infoDiv.style.display = 'none';
@@ -574,41 +1957,46 @@ async function buscarInfoProduto() {
 // PREENCHER PREÇO SUGERIDO AUTOMATICAMENTE
 // ============================================================
 async function preencherPrecoSugerido() {
-    const produtoNome = document.getElementById('produtoVenda').value;
+    const produtoSelecionado = obterProdutoSelecionadoVenda();
     const quantidade = parseInt(document.getElementById('quantidadeVenda').value) || 1;
-    
-    if (!produtoNome) {
+
+    if (!produtoSelecionado) {
+        precoSugeridoAtualVenda = null;
+        document.getElementById('precoVenda').value = '';
         document.getElementById('previewTotal').value = 0;
+        limparCamposDesconto();
         await calcularPreview();
         return;
     }
-    
+
     try {
-        const q = window.query(
-            window.collection(window.db, 'lotes'),
-            window.where('produto', '==', produtoNome),
-            window.where('ativo', '==', true)
-        );
-        const snapshot = await window.getDocs(q);
-        
+        const camposDesconto = obterCamposDesconto();
+        if (camposDesconto.area) camposDesconto.area.style.display = 'block';
+
+        const lotes = await buscarLotesDisponiveisPorProduto(produtoSelecionado);
+
         let valorSugerido = null;
-        snapshot.forEach(doc => {
-            const l = doc.data();
-            const saldo = l.quantidade - l.vendido;
-            if (saldo > 0 && l.valorSugerido) {
-                valorSugerido = l.valorSugerido;
+        lotes.forEach(lote => {
+            if (lote.saldo > 0 && lote.valorSugerido) {
+                valorSugerido = lote.valorSugerido;
             }
         });
-        
+
+        precoSugeridoAtualVenda = valorSugerido || null;
+
         if (valorSugerido) {
-            document.getElementById('previewTotal').value = (valorSugerido * quantidade).toFixed(2);
+            document.getElementById('precoVenda').value = valorSugerido.toFixed(2).replace('.', ',');
+            atualizarTotalVendaPorPrecoUnitario();
         } else {
+            document.getElementById('precoVenda').value = '';
             document.getElementById('previewTotal').value = 0;
         }
-        
+
+        atualizarCamposDesconto();
+        await carregarHistoricoDescontos(produtoSelecionado, valorSugerido);
         await calcularPreview();
         await buscarInfoProduto();
-        
+
     } catch (error) {
         console.error('Erro ao buscar preço sugerido:', error);
     }
@@ -623,19 +2011,20 @@ async function carregarEstoqueLotes() {
     try {
         const filtroMarca = document.getElementById('filtroMarca')?.value || '';
         const filtroFamilia = document.getElementById('filtroFamilia')?.value || '';
-        
+        const filtroBusca = normalizarComparacao(document.getElementById('filtroBuscaEstoque')?.value || '');
+
         const marcasSnapshot = await window.getDocs(window.collection(window.db, 'marcas'));
         const logos = {};
         marcasSnapshot.forEach(doc => {
             const m = doc.data();
             logos[m.nome] = m.logoUrl || '';
         });
-        
+
         const snapshot = await window.getDocs(window.collection(window.db, 'lotes'));
         const listaDiv = document.getElementById('estoqueLista');
-        
+
         if (!listaDiv) return;
-        
+
         if (snapshot.empty) {
             listaDiv.innerHTML = `
                 <div style="text-align:center; padding:60px 20px; color:#888;">
@@ -646,19 +2035,28 @@ async function carregarEstoqueLotes() {
             `;
             return;
         }
-        
+
         preencherFiltros(snapshot);
-        
+
         const produtos = {};
         snapshot.forEach(doc => {
             const l = doc.data();
             const saldo = l.quantidade - l.vendido;
             if (saldo <= 0) return;
-            
+
             if (filtroMarca && l.marca !== filtroMarca) return;
             if (filtroFamilia && l.familia !== filtroFamilia) return;
-            
-            const chave = `${l.produto}|${l.marca}|${l.sabor}|${l.peso}`;
+
+            const textoProduto = normalizarComparacao([
+                l.produto,
+                l.marca,
+                l.sabor,
+                l.peso,
+                l.familia
+            ].filter(Boolean).join(' '));
+            if (filtroBusca && !textoProduto.includes(filtroBusca)) return;
+
+            const chave = criarChaveProdutoDoLote(l);
             if (!produtos[chave]) {
                 produtos[chave] = {
                     produto: l.produto,
@@ -688,7 +2086,7 @@ async function carregarEstoqueLotes() {
                 produtos[chave].valorSugerido = l.valorSugerido;
             }
         });
-        
+
         if (Object.keys(produtos).length === 0) {
             listaDiv.innerHTML = `
                 <div style="text-align:center; padding:60px 20px; color:#888;">
@@ -698,7 +2096,7 @@ async function carregarEstoqueLotes() {
             `;
             return;
         }
-        
+
         const grupos = {};
         for (const chave in produtos) {
             const p = produtos[chave];
@@ -707,14 +2105,14 @@ async function carregarEstoqueLotes() {
             }
             grupos[p.familia].push(p);
         }
-        
+
         const familiasOrdenadas = Object.keys(grupos).sort();
-        
+
         let html = '';
-        
+
         for (const familia of familiasOrdenadas) {
             const items = grupos[familia];
-            
+
             html += `
                 <div style="margin-bottom: 30px;">
                     <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px; border-bottom: 2px solid rgba(245, 166, 35, 0.15); padding-bottom: 8px;">
@@ -723,19 +2121,19 @@ async function carregarEstoqueLotes() {
                         <span style="color: #888; font-size: 14px; font-weight: 400;">(${items.length} produtos)</span>
                         ${modoInternoAtivo ? `<span style="color: #ff9800; font-size: 12px; font-weight: 600;"><i class="fas fa-lock"></i> MODO INTERNO</span>` : ''}
                     </div>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(${modoInternoAtivo ? '440px' : '180px'}, 1fr)); gap: 18px;">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, ${modoInternoAtivo ? '440px' : '180px'}), 1fr)); gap: 18px;">
             `;
-            
+
             for (const p of items) {
                 const logoUrl = logos[p.marca] || '';
                 const valorSugerido = p.valorSugerido || p.lotes[0]?.valorSugerido || null;
-                
+
                 if (modoInternoAtivo) {
     // ===== MODO INTERNO - VISUAL MODERNO =====
     const lucroTotalGeral = p.lotes.reduce((acc, l) => acc + ((l.valorSugerido || 0) - l.custoUnitario) * l.quantidade, 0);
     const custoTotalGeral = p.lotes.reduce((acc, l) => acc + l.custoUnitario * l.quantidade, 0);
     const margemMedia = p.lotes.reduce((acc, l) => acc + ((l.valorSugerido || 0) - l.custoUnitario) / (l.valorSugerido || 1) * 100, 0) / p.lotes.length;
-    
+
     html += `
         <div style="
             background: rgba(255,255,255,0.03);
@@ -753,29 +2151,23 @@ async function carregarEstoqueLotes() {
             <div style="display:flex; gap:16px; align-items:center; margin-bottom:16px; padding-bottom:14px; border-bottom:1px solid rgba(255,255,255,0.06);">
                 <!-- Imagem -->
                 <div style="
-                    width:70px; height:70px; 
-                    background:rgba(255,255,255,0.05); 
-                    border-radius:14px; 
-                    overflow:hidden; 
-                    display:flex; 
-                    align-items:center; 
+                    width:70px; height:70px;
+                    background:rgba(255,255,255,0.05);
+                    border-radius:14px;
+                    overflow:hidden;
+                    display:flex;
+                    align-items:center;
                     justify-content:center;
                     flex-shrink:0;
                     border:1px solid rgba(255,255,255,0.05);
                 ">
-                    ${p.imagemUrl && p.imagemUrl.trim() !== '' ? 
-                        `<img src="${p.imagemUrl}" alt="${p.produto}" style="width:100%; height:100%; object-fit:contain; padding:6px;" onerror="this.style.display='none'; this.parentElement.innerHTML='<span style=\\'color:#555; font-size:28px;\\'><i class=\\'fas fa-box\\'></i></span>';">` :
-                        `<span style="color:#555; font-size:28px;"><i class="fas fa-box"></i></span>`
-                    }
+                    ${renderizarImagemProduto(p.produto, p.marca, p.imagemUrl)}
                 </div>
-                
+
                 <!-- Nome e Marca -->
                 <div style="flex:1; min-width:0;">
                     <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                        ${logoUrl ? 
-                            `<img src="${logoUrl}" alt="${p.marca}" style="width:24px; height:24px; object-fit:contain; border-radius:6px;">` :
-                            `<span style="color:#666; font-size:14px;"><i class="fas fa-tag"></i></span>`
-                        }
+                        ${renderizarLogoMarca(p.marca, logoUrl)}
                         <span style="font-size:13px; color:#F5A623; font-weight:600;">${p.marca}</span>
                         <span style="color:#444; font-size:16px; font-weight:300;">|</span>
                         <span style="font-size:18px; font-weight:700; color:#fff;">${p.produto}</span>
@@ -788,7 +2180,7 @@ async function carregarEstoqueLotes() {
                         </span>
                     </div>
                 </div>
-                
+
                 <!-- Preço Sugerido (destaque) -->
                 <div style="text-align:right; flex-shrink:0;">
                     <div style="font-size:11px; color:#666; text-transform:uppercase; letter-spacing:0.5px;">Preço sugerido</div>
@@ -797,7 +2189,7 @@ async function carregarEstoqueLotes() {
                     </div>
                 </div>
             </div>
-            
+
             <!-- LISTA DE LOTES -->
             <div style="display:grid; gap:12px; margin-bottom:16px;">
                 <div style="display:grid; grid-template-columns: 1fr 0.5fr 0.8fr 1fr 1fr; gap:6px; font-size:10px; color:#666; text-transform:uppercase; letter-spacing:0.5px; padding:0 4px 6px 4px; border-bottom:1px solid rgba(255,255,255,0.05);">
@@ -808,13 +2200,13 @@ async function carregarEstoqueLotes() {
                     <span style="text-align:right;"><i class="fas fa-chart-line" style="margin-right:4px;"></i> Lucro Total</span>
                 </div>
     `;
-    
+
     p.lotes.forEach(lote => {
         const custoTotal = lote.custoUnitario * lote.quantidade;
         const lucroUnitario = lote.valorSugerido ? (lote.valorSugerido - lote.custoUnitario) : 0;
         const lucroTotalLote = lucroUnitario * lote.quantidade;
         const margem = lote.valorSugerido ? ((lote.valorSugerido - lote.custoUnitario) / lote.valorSugerido * 100) : 0;
-        
+
         html += `
             <div style="
                 background: rgba(0,0,0,0.2);
@@ -835,33 +2227,33 @@ async function carregarEstoqueLotes() {
                 </div>
                 <div style="display:flex; gap:20px; margin-top:6px; padding-top:6px; border-top:1px solid rgba(255,255,255,0.03); flex-wrap:wrap;">
                     <span style="font-size:12px; color:#888;">
-                        <i class="fas fa-coins" style="color:#4caf50; margin-right:4px;"></i> 
+                        <i class="fas fa-coins" style="color:#4caf50; margin-right:4px;"></i>
                         Lucro unitário: <strong style="color:#4caf50;">R$ ${lucroUnitario.toFixed(2)}</strong>
                     </span>
                     <span style="font-size:12px; color:#888;">
-                        <i class="fas fa-percent" style="color:#F5A623; margin-right:4px;"></i> 
+                        <i class="fas fa-percent" style="color:#F5A623; margin-right:4px;"></i>
                         Margem: <strong style="color:#F5A623;">${margem.toFixed(1)}%</strong>
                     </span>
                     <span style="font-size:12px; color:#888;">
-                        <i class="fas fa-calendar-alt" style="color:#666; margin-right:4px;"></i> 
+                        <i class="fas fa-calendar-alt" style="color:#666; margin-right:4px;"></i>
                         Vendido: <strong style="color:#aaa;">${lote.vendido}</strong>
                     </span>
                 </div>
             </div>
         `;
     });
-    
+
     // RESULTADOS DO PRODUTO
     html += `
             </div>
-            
+
             <!-- RESULTADOS DO PRODUTO -->
             <div style="
-                display:grid; 
-                grid-template-columns: repeat(4, 1fr); 
-                gap:10px; 
-                background: rgba(0,0,0,0.25); 
-                border-radius:14px; 
+                display:grid;
+                grid-template-columns: repeat(4, 1fr);
+                gap:10px;
+                background: rgba(0,0,0,0.25);
+                border-radius:14px;
                 padding:14px 16px;
                 border:1px solid rgba(255,255,255,0.04);
             ">
@@ -882,7 +2274,7 @@ async function carregarEstoqueLotes() {
                     <div style="font-size:16px; font-weight:700; color:#4caf50;">${p.totalDisponivel} un.</div>
                 </div>
             </div>
-            
+
             <!-- BOTÃO EDITAR -->
             <button onclick="window.location.href='editar-produto.html?id=${p.lotes[0].id}'" style="
                 margin-top:14px;
@@ -930,29 +2322,26 @@ async function carregarEstoqueLotes() {
                         onmouseout="this.style.transform='translateY(0)'; this.style.borderColor='rgba(255,255,255,0.06)'; this.style.boxShadow='none'; this.style.background='rgba(255,255,255,0.03)';"
                         >
                             <div style="width:120px; height:120px; background:rgba(255,255,255,0.05); border-radius:12px; overflow:hidden; display:flex; align-items:center; justify-content:center; margin-bottom:10px; flex-shrink:0; border:1px solid rgba(255,255,255,0.05);">
-                                ${p.imagemUrl && p.imagemUrl.trim() !== '' ? 
-                                    `<img src="${p.imagemUrl}" alt="${p.produto}" style="width:100%; height:100%; object-fit:contain; padding:4px;" onerror="this.style.display='none'; this.parentElement.innerHTML='<span style=\\'color:#555; font-size:32px;\\'><i class=\\'fas fa-box\\'></i></span>';">` :
-                                    `<span style="color:#555; font-size:32px;"><i class="fas fa-box"></i></span>`
-                                }
+                                ${renderizarImagemProduto(p.produto, p.marca, p.imagemUrl, true)}
                             </div>
-                            
+
                             <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
-                                ${logoUrl ? `<img src="${logoUrl}" alt="${p.marca}" style="width:18px; height:18px; object-fit:contain; border-radius:4px;">` : `<span style="color:#666; font-size:12px;"><i class="fas fa-tag"></i></span>`}
+                                ${logoUrl ? `<img src="${escaparHtml(logoUrl)}" alt="${escaparHtml(p.marca)}" style="width:18px; height:18px; object-fit:contain; border-radius:4px;">` : `<span style="width:18px; height:18px; border-radius:4px; display:inline-flex; align-items:center; justify-content:center; background:rgba(245,166,35,0.1); color:#F5A623; font-size:9px; font-weight:800;">${escaparHtml(obterIniciaisProduto('', p.marca).slice(0, 2))}</span>`}
                                 <span style="font-size:12px; color:#888; font-weight:500;">${p.marca}</span>
                             </div>
-                            
+
                             <div style="font-weight:700; font-size:15px; color:#fff; line-height:1.2; margin-bottom:2px;">${p.produto}</div>
                             <div style="font-size:12px; color:#666; margin-bottom:8px;">${p.peso} ${p.sabor && p.sabor !== 'Sem sabor' ? `• ${p.sabor}` : ''}</div>
-                            
+
                             <div style="font-size:22px; font-weight:800; color:#F5A623; letter-spacing:-0.5px; margin-bottom:4px; text-shadow:0 0 30px rgba(245,166,35,0.1);">
                                 ${valorSugerido ? `R$ ${valorSugerido.toFixed(2)}` : '—'}
                             </div>
-                            
+
                             <div style="font-size:12px; color:#4caf50; font-weight:500; background:rgba(76,175,80,0.1); padding:2px 12px; border-radius:20px; border:1px solid rgba(76,175,80,0.1); display:flex; align-items:center; gap:4px; margin-top:2px;">
                                 <i class="fas fa-box" style="font-size:10px;"></i>
                                 ${p.totalDisponivel} unidade${p.totalDisponivel > 1 ? 's' : ''} disponíve${p.totalDisponivel > 1 ? 'is' : 'l'}
                             </div>
-                            
+
                             <div style="margin-top:10px; width:100%;">
                                 <button onclick="window.location.href='editar-produto.html?id=${p.lotes[0].id}'" style="
                                     background: rgba(245, 166, 35, 0.1);
@@ -977,15 +2366,15 @@ async function carregarEstoqueLotes() {
                     `;
                 }
             }
-            
+
             html += `
                     </div>
                 </div>
             `;
         }
-        
+
         listaDiv.innerHTML = html;
-        
+
     } catch (error) {
         console.error('Erro detalhado:', error);
         document.getElementById('estoqueLista').innerHTML = '❌ Erro ao carregar estoque: ' + error.message;
@@ -998,7 +2387,7 @@ function toggleModoEstoque() {
     modoInternoAtivo = !modoInternoAtivo;
     const botao = document.getElementById('toggleModoEstoque');
     const texto = document.getElementById('modoTexto');
-    
+
     if (modoInternoAtivo) {
         botao.style.background = 'rgba(76, 175, 80, 0.1)';
         botao.style.borderColor = 'rgba(76, 175, 80, 0.2)';
@@ -1008,7 +2397,7 @@ function toggleModoEstoque() {
         botao.style.borderColor = 'rgba(245,166,35,0.2)';
         botao.innerHTML = '<i class="fas fa-eye"></i> <span id="modoTexto">Modo Interno</span>';
     }
-    
+
     carregarEstoqueLotes();
 }
 // ============================================================
@@ -1017,7 +2406,7 @@ function toggleModoEstoque() {
 function preencherFiltros(snapshot) {
     const marcas = new Set();
     const familias = new Set();
-    
+
     snapshot.forEach(doc => {
         const l = doc.data();
         const saldo = l.quantidade - l.vendido;
@@ -1026,7 +2415,7 @@ function preencherFiltros(snapshot) {
             if (l.familia) familias.add(l.familia);
         }
     });
-    
+
     const selectMarca = document.getElementById('filtroMarca');
     if (selectMarca && selectMarca.options.length <= 1) {
         const marcasArray = Array.from(marcas).sort();
@@ -1037,7 +2426,7 @@ function preencherFiltros(snapshot) {
             selectMarca.appendChild(option);
         });
     }
-    
+
     const selectFamilia = document.getElementById('filtroFamilia');
     if (selectFamilia && selectFamilia.options.length <= 1) {
         const familiasArray = Array.from(familias).sort();
@@ -1056,52 +2445,41 @@ function preencherFiltros(snapshot) {
 async function carregarSelectProdutos() {
     try {
         const snapshot = await window.getDocs(window.collection(window.db, 'lotes'));
-        
+
         const produtos = {};
         snapshot.forEach(doc => {
             const l = doc.data();
             const saldo = l.quantidade - l.vendido;
             if (saldo <= 0) return;
-            
-            const chave = `${l.produto}|${l.marca}|${l.sabor}|${l.peso}`;
+
+            const chave = criarChaveProdutoDoLote(l);
             if (!produtos[chave]) {
                 produtos[chave] = {
                     nome: l.produto,
                     marca: l.marca,
                     sabor: l.sabor,
                     peso: l.peso,
+                    chave,
                     totalSaldo: 0
                 };
             }
             produtos[chave].totalSaldo += saldo;
         });
-        
-        const selectVenda = document.getElementById('produtoVenda');
+
         const selectPerda = document.getElementById('produtoPerda');
-        
-        if (selectVenda) {
-            selectVenda.innerHTML = '';
-            const optionDefault = document.createElement('option');
-            optionDefault.value = '';
-            optionDefault.textContent = '🔽 Selecione um produto';  // ← SEM HTML, TEXTO PURO
-            selectVenda.appendChild(optionDefault);
-            
-            for (const chave in produtos) {
-                const p = produtos[chave];
-                const option = document.createElement('option');
-                option.value = p.nome;
-                option.textContent = `${p.marca} - ${p.nome} (${p.peso}) - ${p.sabor} - Estoque: ${p.totalSaldo}`;
-                selectVenda.appendChild(option);
-            }
-        }
-        
+
+        produtosVendaCache = Object.values(produtos).sort((a, b) => {
+            return `${a.marca} ${a.nome} ${a.peso} ${a.sabor}`.localeCompare(`${b.marca} ${b.nome} ${b.peso} ${b.sabor}`, 'pt-BR');
+        });
+        renderizarSelectVenda(document.getElementById('buscaProdutoVenda')?.value || '');
+
         if (selectPerda) {
             selectPerda.innerHTML = '';
             const optionDefault = document.createElement('option');
             optionDefault.value = '';
             optionDefault.textContent = '🔽 Selecione um produto';
             selectPerda.appendChild(optionDefault);
-            
+
             const lotesSnapshot = await window.getDocs(window.collection(window.db, 'lotes'));
             lotesSnapshot.forEach(doc => {
                 const l = doc.data();
@@ -1114,12 +2492,63 @@ async function carregarSelectProdutos() {
                 }
             });
         }
-        
+
         console.log('✅ Dropdowns atualizados com sucesso!');
-        
+
     } catch (error) {
         console.error('Erro ao carregar produtos:', error);
     }
+}
+
+function renderizarSelectVenda(filtro = '') {
+    const selectVenda = document.getElementById('produtoVenda');
+    if (!selectVenda) return;
+
+    const selecionadoAtual = selectVenda.value;
+    const termo = normalizarComparacao(filtro);
+    const produtosFiltrados = produtosVendaCache.filter(produto => {
+        if (!termo) return true;
+        return normalizarComparacao([
+            produto.marca,
+            produto.nome,
+            produto.peso,
+            produto.sabor
+        ].join(' ')).includes(termo);
+    });
+
+    selectVenda.innerHTML = '';
+    const optionDefault = document.createElement('option');
+    optionDefault.value = '';
+    optionDefault.textContent = produtosVendaCache.length
+        ? `Selecione um produto (${produtosFiltrados.length} encontrados)`
+        : 'Nenhum produto disponível';
+    selectVenda.appendChild(optionDefault);
+
+    produtosFiltrados.forEach(produto => {
+        const option = document.createElement('option');
+        option.value = produto.chave;
+        option.textContent = `${produto.marca} - ${produto.nome}${produto.peso ? ` (${produto.peso})` : ''} - ${produto.sabor} - Estoque: ${produto.totalSaldo}`;
+        selectVenda.appendChild(option);
+    });
+
+    const manteveSelecionado = produtosFiltrados.some(produto => produto.chave === selecionadoAtual);
+
+    if (manteveSelecionado) {
+        selectVenda.value = selecionadoAtual;
+    } else {
+        selectVenda.value = '';
+        if (selecionadoAtual) {
+            precoSugeridoAtualVenda = null;
+            document.getElementById('precoVenda').value = '';
+            document.getElementById('previewTotal').value = '0';
+            document.getElementById('previewLiquido').value = 'R$ 0,00';
+            document.getElementById('previewLucro').value = 'R$ 0,00';
+            document.getElementById('infoProduto').style.display = 'none';
+            limparCamposDesconto();
+        }
+    }
+
+    atualizarResumoVenda();
 }
 // ============================================================
 // GERENCIAR MARCAS
@@ -1129,22 +2558,19 @@ async function carregarMarcas() {
         const snapshot = await window.getDocs(window.collection(window.db, 'marcas'));
         const listaDiv = document.getElementById('marcasLista');
         if (!listaDiv) return;
-        
+
         if (snapshot.empty) {
             listaDiv.innerHTML = '<p>Nenhuma marca cadastrada.</p>';
             return;
         }
-        
+
         let html = '';
         snapshot.forEach(doc => {
             const m = doc.data();
             html += `
                 <div class="item-estoque" style="display:flex; align-items:center; gap:15px; padding:10px; background:rgba(255,255,255,0.05); border-radius:8px; margin-bottom:8px;">
                     <div style="width:50px; height:50px; background:rgba(255,255,255,0.05); border-radius:8px; overflow:hidden; display:flex; align-items:center; justify-content:center;">
-                        ${m.logoUrl ? 
-                            `<img src="${m.logoUrl}" alt="${m.nome}" style="width:100%; height:100%; object-fit:contain;">` :
-                            `<span style="color:#666;"><i class="fas fa-tag"></i></span>`
-                        }
+                        ${renderizarLogoMarca(m.nome, m.logoUrl, '42px')}
                     </div>
                     <div style="flex:1;">
                         <strong>${m.nome}</strong>
@@ -1158,7 +2584,7 @@ async function carregarMarcas() {
             `;
         });
         listaDiv.innerHTML = html;
-        
+
     } catch (error) {
         console.error('Erro ao carregar marcas:', error);
     }
@@ -1169,13 +2595,13 @@ async function salvarMarca(event) {
         event.preventDefault();
         event.stopPropagation();
     }
-    
+
     console.log('🚀 FUNÇÃO salvarMarca FOI CHAMADA!');
-    
+
     const nomeInput = document.getElementById('marcaNome');
     const logoInput = document.getElementById('marcaLogo');
     const messageDiv = document.getElementById('marcaMessage');
-    
+
     if (!nomeInput || !logoInput) {
         console.error('❌ Campos do formulário não encontrados!');
         if (messageDiv) {
@@ -1184,56 +2610,50 @@ async function salvarMarca(event) {
         }
         return;
     }
-    
+
     const nome = nomeInput.value.trim().toUpperCase();
-    const logoUrl = logoInput.value.trim();
-    
+    let logoUrl = logoInput.value.trim();
+
     console.log('📝 Nome digitado:', nome);
-    console.log('📝 Logo URL digitada:', logoUrl);
-    
+
     if (!nome) {
         mostrarNotificacao('Digite o nome da marca.', 'erro');
         return;
     }
-    
-    if (!logoUrl) {
-        mostrarNotificacao('Digite a URL do logo.', 'erro');
-        return;
-    }
-    
+
     try {
         console.log('📤 Tentando salvar no Firebase...');
-        
+
         const q = window.query(
             window.collection(window.db, 'marcas'),
             window.where('nome', '==', nome)
         );
         const snapshot = await window.getDocs(q);
-        
+
         if (!snapshot.empty) {
             const docRef = snapshot.docs[0].ref;
             console.log('🔄 Atualizando marca existente:', docRef.id);
-            await window.updateDoc(docRef, { logoUrl: logoUrl });
+            await window.updateDoc(docRef, logoUrl ? { logoUrl } : { nome });
             mostrarNotificacao(`Logo da marca "${nome}" atualizado!`, 'sucesso');
         } else {
             console.log('➕ Criando nova marca...');
             const docRef = await window.addDoc(window.collection(window.db, 'marcas'), {
                 nome: nome,
-                logoUrl: logoUrl
+                logoUrl
             });
             console.log('✅ Documento criado com ID:', docRef.id);
             mostrarNotificacao(`Marca "${nome}" adicionada!`, 'sucesso');
         }
-        
+
         nomeInput.value = '';
         logoInput.value = '';
-        
+
         console.log('🔄 Recarregando listas...');
         await carregarMarcas();
         await carregarEstoqueLotes();
-        
+
         console.log('✅ Processo concluído com sucesso!');
-        
+
     } catch (error) {
         console.error('❌ ERRO AO SALVAR:', error);
         mostrarNotificacao(`Erro ao salvar marca: ${error.message}`, 'erro');
@@ -1242,7 +2662,7 @@ async function salvarMarca(event) {
 
 async function excluirMarca(marcaId) {
     if (!confirm('Tem certeza que deseja excluir esta marca?')) return;
-    
+
     try {
         await window.deleteDoc(window.doc(window.db, 'marcas', marcaId));
         carregarMarcas();
@@ -1259,16 +2679,16 @@ async function excluirMarca(marcaId) {
 async function carregarHistoricoVendas() {
     const listaDiv = document.getElementById('historicoLista');
     if (!listaDiv) return;
-    
+
     listaDiv.innerHTML = '<p>⏳ Carregando...</p>';
-    
+
     try {
         const periodo = document.getElementById('filtroPeriodoHistorico')?.value || 'todos';
         const clienteFiltro = document.getElementById('filtroClienteHistorico')?.value.toLowerCase().trim() || '';
-        
+
         const agora = new Date();
         let dataInicio = new Date(2020, 0, 1);
-        
+
         if (periodo === 'hoje') {
             dataInicio = new Date();
             dataInicio.setHours(0, 0, 0, 0);
@@ -1281,49 +2701,51 @@ async function carregarHistoricoVendas() {
             dataInicio.setMonth(agora.getMonth() - 1);
             dataInicio.setHours(0, 0, 0, 0);
         }
-        
+
         const dataInicioStr = dataInicio.toISOString();
-        
+
         const q = window.query(
             window.collection(window.db, 'vendas'),
             window.where('data', '>=', dataInicioStr)
         );
         const snapshot = await window.getDocs(q);
-        
+
         if (snapshot.empty) {
             listaDiv.innerHTML = '<p><i class="fas fa-inbox"></i> Nenhuma venda registrada neste período.</p>';
             return;
         }
-        
+
         let vendas = [];
         snapshot.forEach(doc => {
             const v = doc.data();
             v.id = doc.id;
             vendas.push(v);
         });
-        
+
         vendas.sort((a, b) => new Date(b.data) - new Date(a.data));
-        
+
         if (clienteFiltro) {
             vendas = vendas.filter(v => v.cliente?.toLowerCase().includes(clienteFiltro));
         }
-        
+
         if (vendas.length === 0) {
             listaDiv.innerHTML = '<p><i class="fas fa-search"></i> Nenhuma venda encontrada com os filtros selecionados.</p>';
             return;
         }
-        
+
         let html = `<div style="display:grid; gap:12px;">`;
-        
+
         vendas.forEach(v => {
             const data = new Date(v.data).toLocaleDateString('pt-BR');
             const hora = new Date(v.data).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-            
+            const detalhesProduto = [v.marca, v.peso, v.sabor].filter(Boolean).join(' - ');
+
             html += `
                 <div style="background:rgba(255,255,255,0.05); border-radius:10px; padding:15px; border-left:4px solid ${v.cancelada ? '#f44336' : '#F5A623'};">
                     <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;">
                         <div>
                             <strong>${v.produto}</strong>
+                            ${detalhesProduto ? `<div style="color:#888; font-size:12px; margin-top:2px;">${detalhesProduto}</div>` : ''}
                             <span style="color:#aaa; font-size:14px; margin-left:10px;">${v.quantidade} un.</span>
                             <span style="color:#aaa; font-size:14px; margin-left:10px;">${v.pagamento}${v.parcelas > 1 ? ` ${v.parcelas}x` : ''}</span>
                             ${v.cancelada ? '<span style="color:#f44336; font-size:12px; margin-left:10px;"><i class="fas fa-ban"></i> CANCELADA</span>' : ''}
@@ -1352,10 +2774,10 @@ async function carregarHistoricoVendas() {
                 </div>
             `;
         });
-        
+
         html += `</div>`;
         listaDiv.innerHTML = html;
-        
+
     } catch (error) {
         console.error('Erro ao carregar histórico:', error);
         listaDiv.innerHTML = '❌ Erro ao carregar histórico de vendas.';
@@ -1368,15 +2790,15 @@ async function carregarHistoricoVendas() {
 async function carregarRelatorio() {
     const periodo = document.getElementById('periodoRelatorio')?.value || 'dia';
     const relatorioDiv = document.getElementById('relatorioDados');
-    
+
     if (!relatorioDiv) return;
-    
+
     relatorioDiv.innerHTML = '<p>⏳ Carregando...</p>';
-    
+
     try {
         const agora = new Date();
         let dataInicio = new Date();
-        
+
         if (periodo === 'dia') {
             dataInicio.setHours(0, 0, 0, 0);
         } else if (periodo === 'semana') {
@@ -1388,96 +2810,206 @@ async function carregarRelatorio() {
         } else if (periodo === 'todos') {
             dataInicio = new Date(2020, 0, 1);
         }
-        
-        const dataInicioStr = dataInicio.toISOString();
-        
-        const vendasQuery = window.query(
-            window.collection(window.db, 'vendas'),
-            window.where('data', '>=', dataInicioStr)
-        );
-        const vendasSnapshot = await window.getDocs(vendasQuery);
-        
+
+        const vendasSnapshot = await window.getDocs(window.collection(window.db, 'vendas'));
+
         let faturamentoBruto = 0;
         let custoTotalVendido = 0;
         let totalVendas = 0;
         let lucroTotal = 0;
+        let totalTaxas = 0;
+        let totalDescontos = 0;
+        let totalJurosRepassados = 0;
+        let faturamentoLiquidoGeral = 0;
+        let vendasComDesconto = 0;
         let vendasPorPagamento = { Pix: 0, Dinheiro: 0, Débito: 0, Crédito: 0 };
         let vendasCanceladas = 0;
-        
+
         vendasSnapshot.forEach(doc => {
             const v = doc.data();
-            
+            const vendaNoPeriodo = dentroDoPeriodo(v.data, dataInicio, periodo);
+
             if (v.cancelada === true) {
-                vendasCanceladas++;
+                if (vendaNoPeriodo) vendasCanceladas++;
                 return;
             }
-            
-            faturamentoBruto += v.valorTotal || 0;
-            custoTotalVendido += v.custoTotal || 0;
+
+            const valorTotalVenda = converterNumero(v.valorTotal);
+            const valorBaseVenda = v.valorBase !== undefined ? converterNumero(v.valorBase) : valorTotalVenda;
+            const totalCobradoCliente = v.totalCobradoCliente !== undefined
+                ? converterNumero(v.totalCobradoCliente)
+                : valorTotalVenda;
+            const custoVenda = converterNumero(v.custoTotal);
+            const valorLiquidoVenda = v.valorLiquido !== undefined ? converterNumero(v.valorLiquido) : valorTotalVenda;
+            const taxaVenda = v.taxaValor !== undefined ? converterNumero(v.taxaValor) : Math.max(0, totalCobradoCliente - valorLiquidoVenda);
+            const quantidadeVenda = converterNumero(v.quantidade) || 1;
+            const precoUnitarioVenda = converterNumero(v.precoUnitario) || (quantidadeVenda > 0 ? valorBaseVenda / quantidadeVenda : 0);
+            const precoReferenciaVenda = converterNumero(v.precoReferencia);
+            const descontoVenda = converterNumero(v.descontoTotal) || (
+                precoReferenciaVenda > 0
+                    ? Math.max(0, precoReferenciaVenda - precoUnitarioVenda) * quantidadeVenda
+                    : 0
+            );
+            const jurosRepassadoVenda = converterNumero(v.jurosRepassado) || (
+                v.repasseJuros === true ? Math.max(0, totalCobradoCliente - valorBaseVenda) : 0
+            );
+            const pagamento = normalizarFormaPagamento(v.pagamento);
+
+            faturamentoLiquidoGeral += valorLiquidoVenda;
+
+            if (!vendaNoPeriodo) return;
+
+            faturamentoBruto += valorBaseVenda;
+            custoTotalVendido += custoVenda;
             totalVendas++;
-            lucroTotal += v.lucro || 0;
-            if (v.pagamento && vendasPorPagamento[v.pagamento] !== undefined) {
-                vendasPorPagamento[v.pagamento] += v.valorTotal || 0;
+            totalTaxas += taxaVenda;
+            totalDescontos += descontoVenda;
+            totalJurosRepassados += jurosRepassadoVenda;
+            if (descontoVenda > 0.004) vendasComDesconto++;
+            lucroTotal += valorLiquidoVenda - custoVenda;
+            if (pagamento && vendasPorPagamento[pagamento] !== undefined) {
+                vendasPorPagamento[pagamento] += valorBaseVenda;
             }
         });
-        
-        const comprasQuery = window.query(
-            window.collection(window.db, 'compras'),
-            window.where('dataCompra', '>=', dataInicioStr)
-        );
-        const comprasSnapshot = await window.getDocs(comprasQuery);
-        
+
+        const comprasSnapshot = await window.getDocs(window.collection(window.db, 'compras'));
+
         let totalInvestidoPeriodo = 0;
-        let investimentoPorSocio = { Mateus: 0, Jonathan: 0 };
-        
+        let totalComprasGeral = 0;
+
         comprasSnapshot.forEach(doc => {
             const c = doc.data();
-            totalInvestidoPeriodo += c.valorTotal || 0;
-            if (c.socio && investimentoPorSocio[c.socio] !== undefined) {
-                investimentoPorSocio[c.socio] += c.valorTotal || 0;
-            }
+            const valorCompra = converterNumero(c.valorTotal);
+
+            totalComprasGeral += valorCompra;
+
+            if (!dentroDoPeriodo(c.dataCompra || c.data || c.dataCriacao, dataInicio, periodo)) return;
+
+            totalInvestidoPeriodo += valorCompra;
         });
-        
-        const perdasQuery = window.query(
-            window.collection(window.db, 'perdas'),
-            window.where('data', '>=', dataInicioStr)
-        );
-        const perdasSnapshot = await window.getDocs(perdasQuery);
+
+        const perdasSnapshot = await window.getDocs(window.collection(window.db, 'perdas'));
         let totalPerdas = 0;
         perdasSnapshot.forEach(doc => {
             const p = doc.data();
-            totalPerdas += p.valorTotal || 0;
+            if (!dentroDoPeriodo(p.data, dataInicio, periodo)) return;
+            totalPerdas += converterNumero(p.valorTotal);
         });
-        
+
+        const despesasSnapshot = await window.getDocs(window.collection(window.db, 'despesas'));
+        let totalDespesas = 0;
+        let totalDespesasGeral = 0;
+        const despesasPorCategoria = {};
+
+        despesasSnapshot.forEach(doc => {
+            const d = doc.data();
+            const valorDespesa = converterNumero(d.valor);
+
+            totalDespesasGeral += valorDespesa;
+
+            if (!dentroDoPeriodo(d.dataDespesa || d.data || d.dataCriacao, dataInicio, periodo)) return;
+
+            const categoria = d.categoria || 'Outros';
+            totalDespesas += valorDespesa;
+            despesasPorCategoria[categoria] = (despesasPorCategoria[categoria] || 0) + valorDespesa;
+        });
+
+        let entradasCaixaGeral = 0;
+        let saidasCaixaGeral = 0;
+        let ajustesCaixaPeriodo = 0;
+
+        try {
+            const caixaSnapshot = await window.getDocs(window.collection(window.db, 'caixa'));
+            caixaSnapshot.forEach(doc => {
+                const movimento = doc.data();
+                const valorCaixa = converterNumero(movimento.valor);
+                const isSaida = movimento.tipo === 'saida';
+
+                if (isSaida) {
+                    saidasCaixaGeral += valorCaixa;
+                } else {
+                    entradasCaixaGeral += valorCaixa;
+                }
+
+                if (dentroDoPeriodo(movimento.dataCaixa || movimento.data || movimento.dataCriacao, dataInicio, periodo)) {
+                    ajustesCaixaPeriodo += isSaida ? -valorCaixa : valorCaixa;
+                }
+            });
+        } catch (error) {
+            console.warn('Não foi possível carregar ajustes de caixa para o relatório:', error);
+        }
+
         const lotesSnapshot = await window.getDocs(window.collection(window.db, 'lotes'));
         let valorEstoque = 0;
         let totalUnidadesEstoque = 0;
         let lotesAtivos = 0;
-        
+
         lotesSnapshot.forEach(doc => {
             const l = doc.data();
-            const saldo = l.quantidade - l.vendido;
+            const saldo = converterNumero(l.quantidade) - converterNumero(l.vendido);
             if (saldo > 0) {
-                valorEstoque += saldo * l.custoUnitario;
+                valorEstoque += saldo * converterNumero(l.custoUnitario);
                 totalUnidadesEstoque += saldo;
                 lotesAtivos++;
             }
         });
-        
+
         const margem = faturamentoBruto > 0 ? (lucroTotal / faturamentoBruto) * 100 : 0;
-        
+        const resultadoFinal = lucroTotal - totalPerdas - totalDespesas;
+        const margemFinal = faturamentoBruto > 0 ? (resultadoFinal / faturamentoBruto) * 100 : 0;
+        const ajustesCaixaGeral = entradasCaixaGeral - saidasCaixaGeral;
+        const saldoOperacionalEstimado = faturamentoLiquidoGeral - totalComprasGeral - totalDespesasGeral + ajustesCaixaGeral;
+        const valorRealEstimado = valorEstoque + saldoOperacionalEstimado;
+
         const periodos = {
             'dia': 'Hoje',
             'semana': 'Esta semana',
             'mes': 'Este mês',
             'todos': 'Todos os períodos'
         };
-        
+
+        const categoriasDespesasHtml = Object.entries(despesasPorCategoria)
+            .sort((a, b) => b[1] - a[1])
+            .map(([categoria, valor]) => `<li><i class="fas fa-receipt"></i> ${escaparHtml(categoria)}: ${formatarMoeda(valor)}</li>`)
+            .join('');
+
         relatorioDiv.innerHTML = `
             <h3 style="margin-bottom:15px;"><i class="fas fa-chart-bar"></i> ${periodos[periodo] || periodo}</h3>
-            
+
             ${vendasCanceladas > 0 ? `<p style="color:#ff9800; font-size:14px;"><i class="fas fa-exclamation-triangle"></i> ${vendasCanceladas} venda(s) cancelada(s) foram ignoradas neste relatório.</p>` : ''}
-            
+
+            <div class="assist-panel">
+                <div class="assist-panel-header">
+                    <h3><i class="fas fa-wallet"></i> Posição estimada da loja</h3>
+                    <span class="metric-pill">Estoque + caixa</span>
+                </div>
+                <div class="relatorio-card">
+                    <div class="card">
+                        <h3><i class="fas fa-scale-balanced"></i> Valor Real Estimado</h3>
+                        <div class="valor ${valorRealEstimado < 0 ? 'vermelho' : ''}">${formatarMoeda(valorRealEstimado)}</div>
+                    </div>
+                    <div class="card">
+                        <h3><i class="fas fa-wallet"></i> Caixa Estimado</h3>
+                        <div class="valor ${saldoOperacionalEstimado < 0 ? 'vermelho' : ''}">${formatarMoeda(saldoOperacionalEstimado)}</div>
+                    </div>
+                    <div class="card">
+                        <h3><i class="fas fa-warehouse"></i> Estoque Atual</h3>
+                        <div class="valor">${formatarMoeda(valorEstoque)}</div>
+                    </div>
+                    <div class="card">
+                        <h3><i class="fas fa-right-left"></i> Ajustes de Caixa</h3>
+                        <div class="valor ${ajustesCaixaGeral < 0 ? 'vermelho' : ''}">${formatarMoeda(ajustesCaixaGeral)}</div>
+                    </div>
+                </div>
+                <p style="color:#888; font-size:12px; line-height:1.5;">
+                    Estimativa pelo histórico registrado: vendas líquidas - compras - despesas + ajustes manuais de caixa.
+                </p>
+            </div>
+
+            <p style="color:#888; font-size:12px; line-height:1.5; margin-bottom:14px;">
+                Resultado final = lucro líquido das vendas, já com taxa da maquineta, menos despesas e perdas. Descontos já reduzem o resultado pelo preço realmente vendido e também aparecem separados como referência comercial.
+            </p>
+
             <div class="relatorio-card">
                 <div class="card">
                     <h3><i class="fas fa-money-bill-wave"></i> Faturamento Bruto</h3>
@@ -1492,30 +3024,57 @@ async function carregarRelatorio() {
                     <div class="valor ${lucroTotal < 0 ? 'vermelho' : ''}">R$ ${lucroTotal.toFixed(2)}</div>
                 </div>
                 <div class="card">
-                    <h3><i class="fas fa-chart-line"></i> Margem de Lucro</h3>
-                    <div class="valor">${margem.toFixed(1)}%</div>
+                    <h3><i class="fas fa-scale-balanced"></i> Resultado Final</h3>
+                    <div class="valor ${resultadoFinal < 0 ? 'vermelho' : ''}">R$ ${resultadoFinal.toFixed(2)}</div>
                 </div>
             </div>
-            
+
+            <div class="relatorio-card">
+                <div class="card">
+                    <h3><i class="fas fa-percent"></i> Taxas da Maquineta</h3>
+                    <div class="valor vermelho">R$ ${totalTaxas.toFixed(2)}</div>
+                </div>
+                <div class="card">
+                    <h3><i class="fas fa-hand-holding-dollar"></i> Juros Repassados</h3>
+                    <div class="valor laranja">R$ ${totalJurosRepassados.toFixed(2)}</div>
+                </div>
+                <div class="card">
+                    <h3><i class="fas fa-tags"></i> Descontos Concedidos</h3>
+                    <div class="valor laranja">R$ ${totalDescontos.toFixed(2)}</div>
+                </div>
+                <div class="card">
+                    <h3><i class="fas fa-receipt"></i> Despesas</h3>
+                    <div class="valor vermelho">R$ ${totalDespesas.toFixed(2)}</div>
+                </div>
+                <div class="card">
+                    <h3><i class="fas fa-wallet"></i> Ajuste Caixa</h3>
+                    <div class="valor ${ajustesCaixaPeriodo < 0 ? 'vermelho' : ''}">R$ ${ajustesCaixaPeriodo.toFixed(2)}</div>
+                </div>
+                <div class="card">
+                    <h3><i class="fas fa-trash-alt"></i> Perdas</h3>
+                    <div class="valor vermelho">R$ ${totalPerdas.toFixed(2)}</div>
+                </div>
+            </div>
+
             <div class="relatorio-card">
                 <div class="card">
                     <h3><i class="fas fa-shopping-cart"></i> Total de Vendas</h3>
                     <div class="valor">${totalVendas}</div>
                 </div>
                 <div class="card">
-                    <h3><i class="fas fa-hand-holding-usd"></i> Total Investido</h3>
+                    <h3><i class="fas fa-hand-holding-usd"></i> Compras no Período</h3>
                     <div class="valor">R$ ${totalInvestidoPeriodo.toFixed(2)}</div>
                 </div>
                 <div class="card">
-                    <h3><i class="fas fa-trash-alt"></i> Perdas</h3>
-                    <div class="valor vermelho">R$ ${totalPerdas.toFixed(2)}</div>
+                    <h3><i class="fas fa-percent"></i> Vendas com Desconto</h3>
+                    <div class="valor">${vendasComDesconto}</div>
                 </div>
                 <div class="card">
                     <h3><i class="fas fa-warehouse"></i> Estoque (valor)</h3>
                     <div class="valor">R$ ${valorEstoque.toFixed(2)}</div>
                 </div>
             </div>
-            
+
             <div class="relatorio-card">
                 <div class="card">
                     <h3><i class="fas fa-cubes"></i> Estoque (unidades)</h3>
@@ -1525,16 +3084,16 @@ async function carregarRelatorio() {
                     <h3><i class="fas fa-tags"></i> Lotes ativos</h3>
                     <div class="valor">${lotesAtivos}</div>
                 </div>
+                <div class="card">
+                    <h3><i class="fas fa-chart-line"></i> Margem de Lucro</h3>
+                    <div class="valor">${margem.toFixed(1)}%</div>
+                </div>
+                <div class="card">
+                    <h3><i class="fas fa-chart-pie"></i> Margem Final</h3>
+                    <div class="valor ${margemFinal < 0 ? 'vermelho' : ''}">${margemFinal.toFixed(1)}%</div>
+                </div>
             </div>
-            
-            <div style="margin-top:20px;">
-                <h4><i class="fas fa-users"></i> Investimento por Sócio</h4>
-                <ul style="margin-top:10px; list-style:none;">
-                    <li><i class="fas fa-user"></i> Mateus: R$ ${investimentoPorSocio.Mateus.toFixed(2)}</li>
-                    <li><i class="fas fa-user"></i> Jonathan: R$ ${investimentoPorSocio.Jonathan.toFixed(2)}</li>
-                </ul>
-            </div>
-            
+
             <div style="margin-top:20px;">
                 <h4><i class="fas fa-credit-card"></i> Vendas por meio de pagamento</h4>
                 <ul style="margin-top:10px; list-style:none;">
@@ -1544,8 +3103,15 @@ async function carregarRelatorio() {
                     <li><i class="fas fa-credit-card"></i> Crédito: R$ ${vendasPorPagamento.Crédito.toFixed(2)}</li>
                 </ul>
             </div>
+
+            <div style="margin-top:20px;">
+                <h4><i class="fas fa-receipt"></i> Despesas por categoria</h4>
+                <ul style="margin-top:10px; list-style:none;">
+                    ${categoriasDespesasHtml || '<li>Nenhuma despesa no período.</li>'}
+                </ul>
+            </div>
         `;
-        
+
     } catch (error) {
         console.error('Erro:', error);
         relatorioDiv.innerHTML = `❌ Erro ao carregar relatório: ${error.message}`;
@@ -1563,54 +3129,69 @@ window.cancelarVenda = async function(vendaId) {
     if (!confirm('⚠️ Tem certeza que deseja CANCELAR esta venda?\n\nOs produtos serão devolvidos ao estoque.\nEsta ação não pode ser desfeita!')) {
         return;
     }
-    
+
     try {
         const docRef = window.doc(window.db, 'vendas', vendaId);
-        const docSnap = await window.getDoc(docRef);
-        
-        if (!docSnap.exists()) {
-            mostrarNotificacao('Venda não encontrada!', 'erro');
-            return;
-        }
-        
-        const venda = docSnap.data();
-        
-        const cancelamento = {
-            vendaId: vendaId,
-            produto: venda.produto,
-            quantidade: venda.quantidade,
-            valorTotal: venda.valorTotal,
-            motivo: 'Cancelamento pelo vendedor',
-            dataOriginal: venda.data,
-            dataCancelamento: new Date().toISOString(),
-            canceladoPor: currentUser?.email || 'desconhecido'
-        };
-        
-        await window.addDoc(window.collection(window.db, 'cancelamentos_vendas'), cancelamento);
-        
-        if (venda.lotesUtilizados && venda.lotesUtilizados.length > 0) {
-            for (const lote of venda.lotesUtilizados) {
-                const loteRef = window.doc(window.db, 'lotes', lote.loteId);
-                const loteSnap = await window.getDoc(loteRef);
-                if (loteSnap.exists()) {
-                    const loteData = loteSnap.data();
-                    const novoVendido = Math.max(0, loteData.vendido - lote.quantidade);
-                    await window.updateDoc(loteRef, {
-                        vendido: novoVendido,
-                        ativo: novoVendido < loteData.quantidade
-                    });
+        await window.runTransaction(window.db, async (transaction) => {
+            const docSnap = await transaction.get(docRef);
+
+            if (!docSnap.exists()) {
+                throw new Error('Venda não encontrada!');
+            }
+
+            const venda = docSnap.data();
+            if (venda.cancelada === true) {
+                throw new Error('Esta venda já está cancelada.');
+            }
+
+            const cancelamento = {
+                vendaId: vendaId,
+                produto: venda.produto,
+                marca: venda.marca || '',
+                sabor: venda.sabor || '',
+                peso: venda.peso || '',
+                quantidade: venda.quantidade,
+                valorTotal: venda.valorTotal,
+                motivo: 'Cancelamento pelo vendedor',
+                dataOriginal: venda.data,
+                dataCancelamento: new Date().toISOString(),
+                canceladoPor: currentUser?.email || 'desconhecido'
+            };
+
+            const atualizacoesLotes = [];
+            if (venda.lotesUtilizados && venda.lotesUtilizados.length > 0) {
+                for (const lote of venda.lotesUtilizados) {
+                    const loteRef = window.doc(window.db, 'lotes', lote.loteId);
+                    const loteSnap = await transaction.get(loteRef);
+                    if (loteSnap.exists()) {
+                        const loteData = loteSnap.data();
+                        const novoVendido = Math.max(0, (loteData.vendido || 0) - lote.quantidade);
+                        atualizacoesLotes.push({
+                            ref: loteRef,
+                            vendido: novoVendido,
+                            ativo: novoVendido < loteData.quantidade
+                        });
+                    }
                 }
             }
-        }
-        
-        await window.updateDoc(docRef, { cancelada: true });
-        
+
+            const cancelamentoRef = window.doc(window.collection(window.db, 'cancelamentos_vendas'));
+            atualizacoesLotes.forEach(lote => {
+                transaction.update(lote.ref, {
+                    vendido: lote.vendido,
+                    ativo: lote.ativo
+                });
+            });
+            transaction.set(cancelamentoRef, cancelamento);
+            transaction.update(docRef, { cancelada: true });
+        });
+
         mostrarNotificacao('Venda cancelada! Produtos devolvidos ao estoque.', 'aviso');
         carregarHistoricoVendas();
         carregarEstoqueLotes();
         carregarSelectProdutos();
         carregarRelatorio();
-        
+
     } catch (error) {
         console.error('Erro ao cancelar venda:', error);
         mostrarNotificacao(`Erro ao cancelar venda: ${error.message}`, 'erro');
@@ -1627,30 +3208,30 @@ function mostrarNotificacao(mensagem, tipo = 'sucesso', duracao = 4000) {
         container.className = 'toast-container';
         document.body.appendChild(container);
     }
-    
+
     const toast = document.createElement('div');
     toast.className = `toast ${tipo}`;
-    
+
     const icones = {
         sucesso: '<i class="fas fa-check-circle" style="font-size:20px;"></i>',
         erro: '<i class="fas fa-exclamation-circle" style="font-size:20px;"></i>',
         aviso: '<i class="fas fa-triangle-exclamation" style="font-size:20px;"></i>',
         info: '<i class="fas fa-info-circle" style="font-size:20px;"></i>'
     };
-    
+
     toast.innerHTML = `
         <span class="toast-icon">${icones[tipo] || icones.info}</span>
         <span>${mensagem}</span>
         <button class="toast-close">&times;</button>
     `;
-    
+
     container.appendChild(toast);
-    
+
     toast.querySelector('.toast-close').addEventListener('click', () => {
         toast.classList.add('removendo');
         setTimeout(() => toast.remove(), 300);
     });
-    
+
     setTimeout(() => {
         if (toast.parentNode) {
             toast.classList.add('removendo');
