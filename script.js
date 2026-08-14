@@ -494,6 +494,7 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('filtroMarca')?.addEventListener('change', carregarEstoqueLotes);
         document.getElementById('filtroFamilia')?.addEventListener('change', carregarEstoqueLotes);
         document.getElementById('filtroBuscaEstoque')?.addEventListener('input', carregarEstoqueLotes);
+        document.getElementById('copiarEstoqueWhatsapp')?.addEventListener('click', copiarEstoqueWhatsApp);
         document.getElementById('limparFiltros')?.addEventListener('click', function() {
             document.getElementById('filtroMarca').value = '';
             document.getElementById('filtroFamilia').value = '';
@@ -2057,11 +2058,191 @@ async function preencherPrecoSugerido() {
 
 let modoInternoAtivo = false;
 
+function obterFiltrosEstoqueAtuais() {
+    return {
+        marca: document.getElementById('filtroMarca')?.value || '',
+        familia: document.getElementById('filtroFamilia')?.value || '',
+        busca: normalizarComparacao(document.getElementById('filtroBuscaEstoque')?.value || '')
+    };
+}
+
+function lotePassaFiltrosEstoque(lote, filtros) {
+    const saldo = calcularSaldoLote(lote);
+    if (saldo <= 0 || lote.ativo === false) return false;
+    if (filtros.marca && lote.marca !== filtros.marca) return false;
+    if (filtros.familia && lote.familia !== filtros.familia) return false;
+
+    const textoProduto = normalizarComparacao([
+        lote.produto,
+        lote.marca,
+        lote.sabor,
+        lote.peso,
+        lote.familia
+    ].filter(Boolean).join(' '));
+
+    return !filtros.busca || textoProduto.includes(filtros.busca);
+}
+
+function obterEmojiFamilia(familia) {
+    const texto = normalizarComparacao(familia);
+    if (texto.includes('whey')) return '🥤';
+    if (texto.includes('creatina')) return '💪';
+    if (texto.includes('pre') || texto.includes('termogenico')) return '⚡';
+    if (texto.includes('vitamina') || texto.includes('multi')) return '💊';
+    if (texto.includes('bcaa') || texto.includes('amino')) return '🧬';
+    if (texto.includes('hipercalorico') || texto.includes('barra')) return '🍫';
+    if (texto.includes('diuretico')) return '🔥';
+    return '📦';
+}
+
+function formatarValorMensagem(valor) {
+    const numero = converterNumero(valor);
+    return numero > 0 ? numero.toFixed(2).replace('.', ',') : '-';
+}
+
+function limparTextoMensagem(valor, fallback = '-') {
+    const texto = (valor || '').toString().replace(/\s+/g, ' ').trim();
+    return texto || fallback;
+}
+
+function calcularCustoMedioEstoque(lotes) {
+    const totalUnidades = lotes.reduce((acc, lote) => acc + converterNumero(lote.saldo), 0);
+    if (totalUnidades <= 0) return 0;
+    const totalCusto = lotes.reduce((acc, lote) => acc + converterNumero(lote.saldo) * converterNumero(lote.custoUnitario), 0);
+    return totalCusto / totalUnidades;
+}
+
+function obterValorVendaMensagem(produto) {
+    const valorProduto = converterNumero(produto.valorSugerido);
+    if (valorProduto > 0) return valorProduto;
+
+    const loteComValor = produto.lotes.find(lote => converterNumero(lote.valorSugerido) > 0);
+    return loteComValor ? converterNumero(loteComValor.valorSugerido) : 0;
+}
+
+function montarLinhaEstoqueMensagem(produto) {
+    const quantidade = converterNumero(produto.totalDisponivel);
+    const custo = calcularCustoMedioEstoque(produto.lotes);
+    const venda = obterValorVendaMensagem(produto);
+    return `${quantidade}x - ${limparTextoMensagem(produto.produto)} - ${limparTextoMensagem(produto.sabor, 'Sem sabor')} - ${limparTextoMensagem(produto.marca)} - ${formatarValorMensagem(custo)} - ${formatarValorMensagem(venda)}`;
+}
+
+function montarMensagemEstoqueWhatsApp(produtos) {
+    const grupos = {};
+    produtos.forEach(produto => {
+        const familia = produto.familia || 'Outros';
+        if (!grupos[familia]) grupos[familia] = [];
+        grupos[familia].push(produto);
+    });
+
+    const linhas = [
+        '📦 *ESTOQUE MUNDO MAROMBA* 📦',
+        `Atualizado em ${new Date().toLocaleDateString('pt-BR')}`
+    ];
+
+    Object.keys(grupos).sort().forEach(familia => {
+        const emoji = obterEmojiFamilia(familia);
+        linhas.push('', `${emoji} *${limparTextoMensagem(familia, 'Outros').toUpperCase()}* ${emoji}`);
+
+        grupos[familia]
+            .sort((a, b) => `${a.produto} ${a.sabor} ${a.marca}`.localeCompare(`${b.produto} ${b.sabor} ${b.marca}`, 'pt-BR'))
+            .forEach(produto => linhas.push(montarLinhaEstoqueMensagem(produto)));
+    });
+
+    return linhas.join('\n');
+}
+
+async function obterProdutosEstoqueParaMensagem() {
+    const filtros = obterFiltrosEstoqueAtuais();
+    const snapshot = await window.getDocs(window.collection(window.db, 'lotes'));
+    const produtos = {};
+
+    snapshot.forEach(doc => {
+        const lote = doc.data();
+        if (!lotePassaFiltrosEstoque(lote, filtros)) return;
+
+        const saldo = calcularSaldoLote(lote);
+        const chave = criarChaveProdutoDoLote(lote);
+        if (!produtos[chave]) {
+            produtos[chave] = {
+                produto: lote.produto,
+                marca: lote.marca,
+                sabor: lote.sabor || 'Sem sabor',
+                peso: lote.peso || '',
+                familia: lote.familia || 'Outros',
+                totalDisponivel: 0,
+                valorSugerido: null,
+                lotes: []
+            };
+        }
+
+        const valorSugerido = converterNumero(lote.valorSugerido);
+        produtos[chave].totalDisponivel += saldo;
+        if (valorSugerido > 0 && !produtos[chave].valorSugerido) {
+            produtos[chave].valorSugerido = valorSugerido;
+        }
+        produtos[chave].lotes.push({
+            saldo,
+            custoUnitario: converterNumero(lote.custoUnitario),
+            valorSugerido
+        });
+    });
+
+    return Object.values(produtos);
+}
+
+async function copiarTextoParaAreaTransferencia(texto) {
+    if (navigator.clipboard?.writeText && window.isSecureContext) {
+        await navigator.clipboard.writeText(texto);
+        return;
+    }
+
+    const textarea = document.createElement('textarea');
+    textarea.value = texto;
+    textarea.setAttribute('readonly', '');
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    const copiado = document.execCommand('copy');
+    document.body.removeChild(textarea);
+    if (!copiado) throw new Error('Não foi possível copiar automaticamente.');
+}
+
+async function copiarEstoqueWhatsApp() {
+    const botao = document.getElementById('copiarEstoqueWhatsapp');
+    const textoOriginal = botao?.innerHTML;
+
+    try {
+        if (botao) {
+            botao.disabled = true;
+            botao.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Copiando...';
+        }
+
+        const produtos = await obterProdutosEstoqueParaMensagem();
+        if (produtos.length === 0) {
+            mostrarNotificacao('Nenhum item disponível para copiar com os filtros atuais.', 'aviso');
+            return;
+        }
+
+        const mensagem = montarMensagemEstoqueWhatsApp(produtos);
+        await copiarTextoParaAreaTransferencia(mensagem);
+        const totalUnidades = produtos.reduce((acc, produto) => acc + converterNumero(produto.totalDisponivel), 0);
+        mostrarNotificacao(`Estoque copiado! ${produtos.length} produto(s), ${totalUnidades} un.`, 'sucesso');
+    } catch (error) {
+        console.error('Erro ao copiar estoque:', error);
+        mostrarNotificacao(`Erro ao copiar estoque: ${error.message}`, 'erro');
+    } finally {
+        if (botao) {
+            botao.disabled = false;
+            botao.innerHTML = textoOriginal || '<i class="fab fa-whatsapp"></i> Copiar WhatsApp';
+        }
+    }
+}
+
 async function carregarEstoqueLotes() {
     try {
-        const filtroMarca = document.getElementById('filtroMarca')?.value || '';
-        const filtroFamilia = document.getElementById('filtroFamilia')?.value || '';
-        const filtroBusca = normalizarComparacao(document.getElementById('filtroBuscaEstoque')?.value || '');
+        const filtrosEstoque = obterFiltrosEstoqueAtuais();
 
         const marcasSnapshot = await window.getDocs(window.collection(window.db, 'marcas'));
         const logos = {};
@@ -2092,19 +2273,7 @@ async function carregarEstoqueLotes() {
         snapshot.forEach(doc => {
             const l = doc.data();
             const saldo = calcularSaldoLote(l);
-            if (saldo <= 0 || l.ativo === false) return;
-
-            if (filtroMarca && l.marca !== filtroMarca) return;
-            if (filtroFamilia && l.familia !== filtroFamilia) return;
-
-            const textoProduto = normalizarComparacao([
-                l.produto,
-                l.marca,
-                l.sabor,
-                l.peso,
-                l.familia
-            ].filter(Boolean).join(' '));
-            if (filtroBusca && !textoProduto.includes(filtroBusca)) return;
+            if (!lotePassaFiltrosEstoque(l, filtrosEstoque)) return;
 
             const chave = criarChaveProdutoDoLote(l);
             if (!produtos[chave]) {
@@ -2186,7 +2355,7 @@ async function carregarEstoqueLotes() {
     const margemMedia = p.lotes.reduce((acc, l) => acc + ((l.valorSugerido || 0) - l.custoUnitario) / (l.valorSugerido || 1) * 100, 0) / p.lotes.length;
 
     html += `
-        <div style="
+        <div class="stock-internal-card" style="
             background: rgba(255,255,255,0.03);
             border-radius: 20px;
             padding: 20px 22px;
@@ -2243,7 +2412,7 @@ async function carregarEstoqueLotes() {
 
             <!-- LISTA DE LOTES -->
             <div style="display:grid; gap:12px; margin-bottom:16px;">
-                <div style="display:grid; grid-template-columns: 1fr 0.5fr 0.8fr 1fr 1fr; gap:6px; font-size:10px; color:#666; text-transform:uppercase; letter-spacing:0.5px; padding:0 4px 6px 4px; border-bottom:1px solid rgba(255,255,255,0.05);">
+                <div class="stock-lot-table" style="display:grid; grid-template-columns: 1fr 0.5fr 0.8fr 1fr 1fr; gap:6px; font-size:10px; color:#666; text-transform:uppercase; letter-spacing:0.5px; padding:0 4px 6px 4px; border-bottom:1px solid rgba(255,255,255,0.05);">
                     <span><i class="far fa-calendar-alt" style="margin-right:4px;"></i> Lote</span>
                     <span style="text-align:center;"><i class="fas fa-box" style="margin-right:4px;"></i> Disp.</span>
                     <span style="text-align:right;"><i class="fas fa-tag" style="margin-right:4px;"></i> Custo</span>
@@ -2269,7 +2438,7 @@ async function carregarEstoqueLotes() {
             onmouseover="this.style.background='rgba(0,0,0,0.35)';"
             onmouseout="this.style.background='rgba(0,0,0,0.2)';"
             >
-                <div style="display:grid; grid-template-columns: 1fr 0.5fr 0.8fr 1fr 1fr; gap:6px; align-items:center;">
+                <div class="stock-lot-table" style="display:grid; grid-template-columns: 1fr 0.5fr 0.8fr 1fr 1fr; gap:6px; align-items:center;">
                     <span style="color:#ccc; font-weight:600; font-size:13px;">${lote.dataCompra}</span>
                     <span style="text-align:center; color:#4caf50; font-weight:700; font-size:15px;">${lote.saldo}</span>
                     <span style="text-align:right; color:#ff9800; font-weight:500;">R$ ${lote.custoUnitario.toFixed(2)}</span>
@@ -2299,7 +2468,7 @@ async function carregarEstoqueLotes() {
             </div>
 
             <!-- RESULTADOS DO PRODUTO -->
-            <div style="
+            <div class="stock-results-grid" style="
                 display:grid;
                 grid-template-columns: repeat(4, 1fr);
                 gap:10px;
@@ -2327,7 +2496,7 @@ async function carregarEstoqueLotes() {
             </div>
 
             <!-- BOTÃO EDITAR -->
-            <button onclick="window.location.href='editar-produto.html?id=${p.lotes[0].id}&v=20260813-3'" style="
+            <button onclick="window.location.href='editar-produto.html?id=${p.lotes[0].id}&v=20260814-1'" style="
                 margin-top:14px;
                 width:100%;
                 background: rgba(245, 166, 35, 0.08);
@@ -2394,7 +2563,7 @@ async function carregarEstoqueLotes() {
                             </div>
 
                             <div style="margin-top:10px; width:100%;">
-                                <button onclick="window.location.href='editar-produto.html?id=${p.lotes[0].id}&v=20260813-3'" style="
+                                <button onclick="window.location.href='editar-produto.html?id=${p.lotes[0].id}&v=20260814-1'" style="
                                     background: rgba(245, 166, 35, 0.1);
                                     border: 1px solid rgba(245, 166, 35, 0.15);
                                     color: #F5A623;

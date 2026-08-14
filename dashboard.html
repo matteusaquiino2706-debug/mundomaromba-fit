@@ -744,6 +744,41 @@
             background: rgba(255,255,255,0.025);
         }
 
+        .stock-actions {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 15px;
+        }
+
+        .stock-actions .btn-primary,
+        .stock-actions .btn-secondary {
+            width: auto;
+            min-height: 42px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .stock-copy-btn {
+            background: rgba(37, 211, 102, 0.12);
+            border-color: rgba(37, 211, 102, 0.22);
+            color: #7ee29f;
+        }
+
+        .stock-copy-btn:hover {
+            background: rgba(37, 211, 102, 0.2);
+            border-color: rgba(37, 211, 102, 0.35);
+        }
+
+        .stock-copy-btn:disabled {
+            cursor: wait;
+            opacity: 0.7;
+        }
+
         .btn-danger {
             background: rgba(244, 67, 54, 0.12);
             color: #ff6b6b;
@@ -1255,6 +1290,47 @@
                 min-width: 100%;
             }
 
+            .stock-actions {
+                display: grid;
+                grid-template-columns: 1fr;
+                gap: 8px;
+            }
+
+            .stock-actions .btn-primary,
+            .stock-actions .btn-secondary {
+                width: 100%;
+                min-height: 48px;
+                font-size: 15px;
+            }
+
+            #estoque .produto-card {
+                border-radius: 12px !important;
+                padding: 14px 12px 16px !important;
+            }
+
+            #estoque .produto-card > div:first-child {
+                width: 104px !important;
+                height: 104px !important;
+            }
+
+            .stock-internal-card {
+                padding: 14px !important;
+                border-radius: 14px !important;
+            }
+
+            .stock-lot-table {
+                grid-template-columns: minmax(82px, 1fr) 52px minmax(70px, 0.8fr) minmax(86px, 1fr) !important;
+                gap: 5px !important;
+            }
+
+            .stock-lot-table span:nth-child(5) {
+                display: none !important;
+            }
+
+            .stock-results-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            }
+
             .info-grid {
                 grid-template-columns: 1fr 1fr;
                 gap: 8px;
@@ -1262,8 +1338,8 @@
 
             /* Botão modo interno no mobile */
             #toggleModoEstoque {
-                font-size: 11px !important;
-                padding: 4px 10px !important;
+                font-size: 15px !important;
+                padding: 10px 12px !important;
             }
         }
 
@@ -1292,6 +1368,18 @@
 
             .history-detail-grid {
                 grid-template-columns: 1fr;
+            }
+
+            .stock-lot-table {
+                grid-template-columns: minmax(74px, 1fr) 46px minmax(68px, 0.8fr) !important;
+            }
+
+            .stock-lot-table span:nth-child(4) {
+                display: none !important;
+            }
+
+            .stock-results-grid {
+                grid-template-columns: 1fr !important;
             }
         }
     </style>
@@ -1716,8 +1804,11 @@
                 </div>
             </div>
 
-            <!-- BOTÃO MODO INTERNO -->
-            <div style="display:flex; justify-content:flex-end; margin-bottom:15px;">
+            <!-- AÇÕES DO ESTOQUE -->
+            <div class="stock-actions">
+                <button id="copiarEstoqueWhatsapp" class="btn-primary stock-copy-btn">
+                    <i class="fab fa-whatsapp"></i> Copiar WhatsApp
+                </button>
                 <button id="toggleModoEstoque" class="btn-secondary" style="background:rgba(245,166,35,0.1); border-color:rgba(245,166,35,0.2);">
                     <i class="fas fa-eye"></i> <span id="modoTexto">Modo Interno</span>
                 </button>
@@ -1995,7 +2086,7 @@
     </main>
 
     <!-- SCRIPTS -->
-    <script type="module" src="firebase-config.js?v=20260813-3"></script>
-    <script type="module" src="script.js?v=20260813-3"></script>
+    <script type="module" src="firebase-config.js?v=20260814-1"></script>
+    <script type="module" src="script.js?v=20260814-1"></script>
 </body>
 </html>
