@@ -10,6 +10,7 @@ let produtosCompraCache = {};
 let produtosVendaCache = [];
 const MARGEM_PADRAO_COMPRA = 0.4;
 let valorSugeridoAutomaticoCompra = '';
+let historicoTipoAtual = 'vendas';
 
 // ============================================================
 // TABELA DE TAXAS DA MAQUINETA
@@ -449,10 +450,11 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         // Eventos do histórico
-        document.getElementById('filtroPeriodoHistorico')?.addEventListener('change', carregarHistoricoVendas);
-        document.getElementById('aplicarFiltrosHistorico')?.addEventListener('click', carregarHistoricoVendas);
+        configurarHistoricoMovimentacoes();
+        document.getElementById('filtroPeriodoHistorico')?.addEventListener('change', carregarHistoricoMovimentacoes);
+        document.getElementById('aplicarFiltrosHistorico')?.addEventListener('click', carregarHistoricoMovimentacoes);
         document.getElementById('filtroClienteHistorico')?.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') carregarHistoricoVendas();
+            if (e.key === 'Enter') carregarHistoricoMovimentacoes();
         });
 
         // Eventos para calcular preview
@@ -604,7 +606,7 @@ function mudarAba(abaId) {
         carregarDespesas();
     }
     if (abaId === 'marcas') carregarMarcas();
-    if (abaId === 'historico') carregarHistoricoVendas();
+    if (abaId === 'historico') carregarHistoricoMovimentacoes();
 }
 
 // ============================================================
@@ -2711,98 +2713,195 @@ async function excluirMarca(marcaId) {
 }
 
 // ============================================================
-// HISTÓRICO DE VENDAS
+// HISTÓRICO DE MOVIMENTAÇÕES
 // ============================================================
+function configurarHistoricoMovimentacoes() {
+    document.querySelectorAll('[data-historico-tipo]').forEach(botao => {
+        botao.addEventListener('click', () => {
+            historicoTipoAtual = botao.dataset.historicoTipo || 'vendas';
+            atualizarAbasHistorico();
+            carregarHistoricoMovimentacoes();
+        });
+    });
+
+    atualizarAbasHistorico();
+}
+
+function atualizarAbasHistorico() {
+    document.querySelectorAll('[data-historico-tipo]').forEach(botao => {
+        botao.classList.toggle('active', botao.dataset.historicoTipo === historicoTipoAtual);
+    });
+}
+
+async function carregarHistoricoMovimentacoes() {
+    atualizarAbasHistorico();
+
+    if (historicoTipoAtual === 'compras') {
+        await carregarHistoricoCompras();
+        return;
+    }
+
+    await carregarHistoricoVendas();
+}
+
+function obterDataInicioHistorico(periodo) {
+    const agora = new Date();
+    let dataInicio = new Date(2020, 0, 1);
+
+    if (periodo === 'hoje') {
+        dataInicio = new Date();
+        dataInicio.setHours(0, 0, 0, 0);
+    } else if (periodo === 'semana') {
+        dataInicio = new Date();
+        dataInicio.setDate(agora.getDate() - 7);
+        dataInicio.setHours(0, 0, 0, 0);
+    } else if (periodo === 'mes') {
+        dataInicio = new Date();
+        dataInicio.setMonth(agora.getMonth() - 1);
+        dataInicio.setHours(0, 0, 0, 0);
+    }
+
+    return dataInicio;
+}
+
+function obterFiltroHistorico() {
+    return {
+        periodo: document.getElementById('filtroPeriodoHistorico')?.value || 'todos',
+        busca: normalizarComparacao(document.getElementById('filtroClienteHistorico')?.value || '')
+    };
+}
+
+function formatarDataHoraHistorico(valor) {
+    const data = converterData(valor);
+    if (!data) return '-';
+    return `${data.toLocaleDateString('pt-BR')} ${data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+}
+
+function renderizarResumoHistorico(itens) {
+    return `
+        <div class="mini-stat">
+            <label>${itens[0]?.label || '-'}</label>
+            <strong>${itens[0]?.valor || '-'}</strong>
+        </div>
+        <div class="mini-stat">
+            <label>${itens[1]?.label || '-'}</label>
+            <strong>${itens[1]?.valor || '-'}</strong>
+        </div>
+        <div class="mini-stat">
+            <label>${itens[2]?.label || '-'}</label>
+            <strong>${itens[2]?.valor || '-'}</strong>
+        </div>
+        <div class="mini-stat">
+            <label>${itens[3]?.label || '-'}</label>
+            <strong>${itens[3]?.valor || '-'}</strong>
+        </div>
+    `;
+}
+
+function renderizarVazioHistorico(mensagem) {
+    return `
+        <div class="history-empty">
+            <i class="fas fa-inbox" style="font-size:34px; color:#333;"></i>
+            <p style="margin-top:10px;">${escaparHtml(mensagem)}</p>
+        </div>
+    `;
+}
+
 async function carregarHistoricoVendas() {
     const listaDiv = document.getElementById('historicoLista');
+    const resumoDiv = document.getElementById('historicoResumo');
     if (!listaDiv) return;
 
-    listaDiv.innerHTML = '<p>⏳ Carregando...</p>';
+    listaDiv.innerHTML = '<p>Carregando vendas...</p>';
+    if (resumoDiv) resumoDiv.innerHTML = '';
 
     try {
-        const periodo = document.getElementById('filtroPeriodoHistorico')?.value || 'todos';
-        const clienteFiltro = document.getElementById('filtroClienteHistorico')?.value.toLowerCase().trim() || '';
-
-        const agora = new Date();
-        let dataInicio = new Date(2020, 0, 1);
-
-        if (periodo === 'hoje') {
-            dataInicio = new Date();
-            dataInicio.setHours(0, 0, 0, 0);
-        } else if (periodo === 'semana') {
-            dataInicio = new Date();
-            dataInicio.setDate(agora.getDate() - 7);
-            dataInicio.setHours(0, 0, 0, 0);
-        } else if (periodo === 'mes') {
-            dataInicio = new Date();
-            dataInicio.setMonth(agora.getMonth() - 1);
-            dataInicio.setHours(0, 0, 0, 0);
-        }
-
-        const dataInicioStr = dataInicio.toISOString();
-
-        const q = window.query(
-            window.collection(window.db, 'vendas'),
-            window.where('data', '>=', dataInicioStr)
-        );
-        const snapshot = await window.getDocs(q);
-
-        if (snapshot.empty) {
-            listaDiv.innerHTML = '<p><i class="fas fa-inbox"></i> Nenhuma venda registrada neste período.</p>';
-            return;
-        }
+        const { periodo, busca } = obterFiltroHistorico();
+        const dataInicio = obterDataInicioHistorico(periodo);
+        const snapshot = await window.getDocs(window.collection(window.db, 'vendas'));
 
         let vendas = [];
         snapshot.forEach(doc => {
             const v = doc.data();
-            v.id = doc.id;
-            vendas.push(v);
+            if (!dentroDoPeriodo(v.data, dataInicio, periodo)) return;
+
+            const textoBusca = normalizarComparacao([
+                v.produto,
+                v.marca,
+                v.sabor,
+                v.peso,
+                v.cliente,
+                v.contato,
+                v.pagamento
+            ].filter(Boolean).join(' '));
+
+            if (busca && !textoBusca.includes(busca)) return;
+
+            vendas.push({ ...v, id: doc.id });
         });
 
         vendas.sort((a, b) => new Date(b.data) - new Date(a.data));
 
-        if (clienteFiltro) {
-            vendas = vendas.filter(v => v.cliente?.toLowerCase().includes(clienteFiltro));
-        }
-
         if (vendas.length === 0) {
-            listaDiv.innerHTML = '<p><i class="fas fa-search"></i> Nenhuma venda encontrada com os filtros selecionados.</p>';
+            listaDiv.innerHTML = renderizarVazioHistorico('Nenhuma venda encontrada com os filtros selecionados.');
             return;
         }
 
-        let html = `<div style="display:grid; gap:12px;">`;
+        const vendasAtivas = vendas.filter(v => v.cancelada !== true);
+        const totalVendido = vendasAtivas.reduce((acc, v) => acc + converterNumero(v.valorTotal), 0);
+        const totalLiquido = vendasAtivas.reduce((acc, v) => acc + (v.valorLiquido !== undefined ? converterNumero(v.valorLiquido) : converterNumero(v.valorTotal)), 0);
+        const totalItens = vendasAtivas.reduce((acc, v) => acc + converterNumero(v.quantidade), 0);
+        const canceladas = vendas.filter(v => v.cancelada === true).length;
+
+        if (resumoDiv) {
+            resumoDiv.innerHTML = renderizarResumoHistorico([
+                { label: 'Vendas ativas', valor: vendasAtivas.length },
+                { label: 'Total vendido', valor: formatarMoeda(totalVendido) },
+                { label: 'Líquido estimado', valor: formatarMoeda(totalLiquido) },
+                { label: 'Itens / canceladas', valor: `${totalItens} / ${canceladas}` }
+            ]);
+        }
+
+        let html = '<div class="history-list">';
 
         vendas.forEach(v => {
-            const data = new Date(v.data).toLocaleDateString('pt-BR');
-            const hora = new Date(v.data).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-            const detalhesProduto = [v.marca, v.peso, v.sabor].filter(Boolean).join(' - ');
+            const isCancelada = v.cancelada === true;
+            const detalhesProduto = [v.marca, v.peso, v.sabor && v.sabor !== 'Sem sabor' ? v.sabor : ''].filter(Boolean).join(' - ');
+            const pagamento = normalizarFormaPagamento(v.pagamento) || '-';
+            const parcelas = converterNumero(v.parcelas);
+            const valorVenda = converterNumero(v.valorTotal);
+            const valorLiquido = v.valorLiquido !== undefined ? converterNumero(v.valorLiquido) : valorVenda;
 
             html += `
-                <div style="background:rgba(255,255,255,0.05); border-radius:10px; padding:15px; border-left:4px solid ${v.cancelada ? '#f44336' : '#F5A623'};">
-                    <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;">
+                <div class="history-card ${isCancelada ? 'cancelada' : ''}">
+                    <div class="history-card-header">
                         <div>
-                            <strong>${v.produto}</strong>
-                            ${detalhesProduto ? `<div style="color:#888; font-size:12px; margin-top:2px;">${detalhesProduto}</div>` : ''}
-                            <span style="color:#aaa; font-size:14px; margin-left:10px;">${v.quantidade} un.</span>
-                            <span style="color:#aaa; font-size:14px; margin-left:10px;">${v.pagamento}${v.parcelas > 1 ? ` ${v.parcelas}x` : ''}</span>
-                            ${v.cancelada ? '<span style="color:#f44336; font-size:12px; margin-left:10px;"><i class="fas fa-ban"></i> CANCELADA</span>' : ''}
+                            <div class="history-title-row">
+                                <span class="history-kind ${isCancelada ? 'cancelada' : ''}">${isCancelada ? 'Cancelada' : 'Venda'}</span>
+                                <strong>${escaparHtml(v.produto || 'Produto sem nome')}</strong>
+                            </div>
+                            <div class="history-meta">
+                                ${detalhesProduto ? `${escaparHtml(detalhesProduto)} · ` : ''}
+                                ${converterNumero(v.quantidade)} un. · ${escaparHtml(pagamento)}${parcelas > 1 ? ` ${parcelas}x` : ''}
+                            </div>
                         </div>
-                        <div style="text-align:right;">
-                            <div style="font-weight:bold; font-size:18px; color:${v.cancelada ? '#f44336' : '#4caf50'};">R$ ${v.valorTotal.toFixed(2)}</div>
-                            <div style="font-size:12px; color:#aaa;">${data} ${hora}</div>
+                        <div>
+                            <div class="history-total ${isCancelada ? 'cancelada' : ''}">${formatarMoeda(valorVenda)}</div>
+                            <div class="history-meta" style="text-align:right;">${formatarDataHoraHistorico(v.data)}</div>
                         </div>
                     </div>
-                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; margin-top:10px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.05);">
-                        <div style="font-size:14px; color:#aaa;">
-                            <i class="fas fa-user"></i> ${v.cliente || 'Cliente não identificado'}
-                            ${v.contato ? `<i class="fas fa-phone" style="margin-left:10px;"></i> ${v.contato}` : ''}
+                    <div class="history-card-footer">
+                        <div class="history-meta">
+                            <i class="fas fa-user"></i> ${escaparHtml(v.cliente || 'Cliente não identificado')}
+                            ${v.contato ? ` · <i class="fas fa-phone"></i> ${escaparHtml(v.contato)}` : ''}
+                            ${!isCancelada ? ` · líquido ${formatarMoeda(valorLiquido)}` : ''}
                         </div>
-                        ${!v.cancelada ? `
-                        <div style="display:flex; gap:8px;">
-                            <button onclick="window.editarVenda('${v.id}')" style="padding:4px 12px; background:#F5A623; border:none; border-radius:5px; color:white; cursor:pointer; font-size:12px;">
+                        ${!isCancelada ? `
+                        <div class="history-actions">
+                            <button type="button" onclick="window.editarVenda('${v.id}')" class="btn-secondary">
                                 <i class="fas fa-edit"></i> Editar
                             </button>
-                            <button onclick="window.cancelarVenda('${v.id}')" style="padding:4px 12px; background:#f44336; border:none; border-radius:5px; color:white; cursor:pointer; font-size:12px;">
+                            <button type="button" onclick="window.cancelarVenda('${v.id}')" class="btn-danger">
                                 <i class="fas fa-times"></i> Cancelar
                             </button>
                         </div>
@@ -2817,7 +2916,118 @@ async function carregarHistoricoVendas() {
 
     } catch (error) {
         console.error('Erro ao carregar histórico:', error);
-        listaDiv.innerHTML = '❌ Erro ao carregar histórico de vendas.';
+        listaDiv.innerHTML = renderizarVazioHistorico('Erro ao carregar histórico de vendas.');
+    }
+}
+
+async function carregarHistoricoCompras() {
+    const listaDiv = document.getElementById('historicoLista');
+    const resumoDiv = document.getElementById('historicoResumo');
+    if (!listaDiv) return;
+
+    listaDiv.innerHTML = '<p>Carregando compras...</p>';
+    if (resumoDiv) resumoDiv.innerHTML = '';
+
+    try {
+        const { periodo, busca } = obterFiltroHistorico();
+        const dataInicio = obterDataInicioHistorico(periodo);
+        const snapshot = await window.getDocs(window.collection(window.db, 'compras'));
+
+        const compras = [];
+        snapshot.forEach(doc => {
+            const c = doc.data();
+            const dataCompra = c.dataCompra || c.data || c.dataCriacao;
+            if (!dentroDoPeriodo(dataCompra, dataInicio, periodo)) return;
+
+            const textoBusca = normalizarComparacao([
+                c.produto,
+                c.marca,
+                c.sabor,
+                c.peso,
+                c.familia,
+                c.valorSugerido,
+                c.custoUnitario
+            ].filter(Boolean).join(' '));
+
+            if (busca && !textoBusca.includes(busca)) return;
+
+            compras.push({
+                ...c,
+                id: doc.id,
+                dataHistorico: dataCompra
+            });
+        });
+
+        compras.sort((a, b) => (converterData(b.dataHistorico) || new Date(0)) - (converterData(a.dataHistorico) || new Date(0)));
+
+        if (compras.length === 0) {
+            listaDiv.innerHTML = renderizarVazioHistorico('Nenhuma compra encontrada com os filtros selecionados.');
+            return;
+        }
+
+        const totalComprado = compras.reduce((acc, c) => acc + converterNumero(c.valorTotal), 0);
+        const totalUnidades = compras.reduce((acc, c) => acc + converterNumero(c.quantidade), 0);
+        const produtosUnicos = new Set(compras.map(c => criarChaveProduto(c.produto, c.marca, c.sabor, c.peso))).size;
+        const custoMedio = totalUnidades > 0 ? totalComprado / totalUnidades : 0;
+
+        if (resumoDiv) {
+            resumoDiv.innerHTML = renderizarResumoHistorico([
+                { label: 'Compras registradas', valor: compras.length },
+                { label: 'Total comprado', valor: formatarMoeda(totalComprado) },
+                { label: 'Unidades', valor: totalUnidades },
+                { label: 'Produtos / custo médio', valor: `${produtosUnicos} / ${formatarMoeda(custoMedio)}` }
+            ]);
+        }
+
+        let html = '<div class="history-list">';
+        compras.forEach(c => {
+            const detalhesProduto = [c.marca, c.peso, c.sabor && c.sabor !== 'Sem sabor' ? c.sabor : ''].filter(Boolean).join(' - ');
+            const quantidade = converterNumero(c.quantidade);
+            const valorTotal = converterNumero(c.valorTotal);
+            const custoUnitario = converterNumero(c.custoUnitario) || (quantidade > 0 ? valorTotal / quantidade : 0);
+            const valorSugerido = converterNumero(c.valorSugerido);
+            const familia = c.familia || 'Outros';
+
+            html += `
+                <div class="history-card compra">
+                    <div class="history-card-header">
+                        <div>
+                            <div class="history-title-row">
+                                <span class="history-kind compra">Compra</span>
+                                <strong>${escaparHtml(c.produto || 'Produto sem nome')}</strong>
+                            </div>
+                            <div class="history-meta">
+                                ${detalhesProduto ? `${escaparHtml(detalhesProduto)} · ` : ''}
+                                ${quantidade} un. · ${escaparHtml(familia)}
+                            </div>
+                        </div>
+                        <div>
+                            <div class="history-total compra">${formatarMoeda(valorTotal)}</div>
+                            <div class="history-meta" style="text-align:right;">${formatarDataHoraHistorico(c.dataHistorico)}</div>
+                        </div>
+                    </div>
+                    <div class="history-card-footer">
+                        <div class="history-meta">
+                            custo ${formatarMoeda(custoUnitario)} un.
+                            ${valorSugerido > 0 ? ` · venda sugerida ${formatarMoeda(valorSugerido)}` : ''}
+                            ${c.loteId ? ` · lote ${escaparHtml(c.loteId.slice(0, 6))}` : ''}
+                        </div>
+                        <div class="history-actions">
+                            <button type="button" onclick="window.abrirEstoqueHistorico()" class="btn-secondary">
+                                <i class="fas fa-boxes"></i> Ver estoque
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+
+        html += '</div>';
+        listaDiv.innerHTML = html;
+
+    } catch (error) {
+        console.error('Erro ao carregar histórico de compras:', error);
+        listaDiv.innerHTML = renderizarVazioHistorico('Erro ao carregar histórico de compras.');
     }
 }
 
@@ -3162,6 +3372,10 @@ window.editarVenda = function(vendaId) {
     window.location.href = `editar-venda.html?id=${vendaId}`;
 };
 
+window.abrirEstoqueHistorico = function() {
+    mudarAba('estoque');
+};
+
 window.cancelarVenda = async function(vendaId) {
     if (!confirm('⚠️ Tem certeza que deseja CANCELAR esta venda?\n\nOs produtos serão devolvidos ao estoque.\nEsta ação não pode ser desfeita!')) {
         return;
@@ -3224,7 +3438,7 @@ window.cancelarVenda = async function(vendaId) {
         });
 
         mostrarNotificacao('Venda cancelada! Produtos devolvidos ao estoque.', 'aviso');
-        carregarHistoricoVendas();
+        carregarHistoricoMovimentacoes();
         carregarEstoqueLotes();
         carregarSelectProdutos();
         carregarRelatorio();

@@ -549,6 +549,162 @@
             justify-content: flex-end;
         }
 
+        .history-tabs {
+            display: inline-grid;
+            grid-template-columns: repeat(2, minmax(120px, 1fr));
+            gap: 6px;
+            padding: 5px;
+            margin-bottom: 16px;
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 10px;
+            background: rgba(0,0,0,0.16);
+        }
+
+        .history-tab {
+            min-height: 40px;
+            border: 1px solid transparent;
+            border-radius: 8px;
+            background: transparent;
+            color: #aaa;
+            cursor: pointer;
+            font-family: 'Inter', sans-serif;
+            font-size: 13px;
+            font-weight: 800;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .history-tab.active,
+        .history-tab:hover {
+            color: #F5A623;
+            border-color: rgba(245,166,35,0.2);
+            background: rgba(245,166,35,0.1);
+        }
+
+        .history-summary-panel {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        .history-list {
+            display: grid;
+            gap: 12px;
+        }
+
+        .history-card {
+            border: 1px solid rgba(255,255,255,0.06);
+            border-left: 4px solid rgba(245,166,35,0.75);
+            border-radius: 10px;
+            background: rgba(255,255,255,0.04);
+            padding: 14px;
+        }
+
+        .history-card.compra {
+            border-left-color: #4caf50;
+        }
+
+        .history-card.cancelada {
+            border-left-color: #f44336;
+            opacity: 0.78;
+        }
+
+        .history-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .history-title-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 4px;
+        }
+
+        .history-title-row strong {
+            color: #fff;
+            font-size: 15px;
+        }
+
+        .history-kind {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 24px;
+            padding: 4px 8px;
+            border-radius: 7px;
+            background: rgba(245,166,35,0.1);
+            color: #F5A623;
+            font-size: 10px;
+            font-weight: 900;
+            text-transform: uppercase;
+        }
+
+        .history-kind.compra {
+            background: rgba(76,175,80,0.11);
+            color: #4caf50;
+        }
+
+        .history-kind.cancelada {
+            background: rgba(244,67,54,0.12);
+            color: #ff6b6b;
+        }
+
+        .history-meta {
+            color: #888;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .history-total {
+            color: #4caf50;
+            font-size: 18px;
+            font-weight: 900;
+            text-align: right;
+        }
+
+        .history-total.compra {
+            color: #F5A623;
+        }
+
+        .history-total.cancelada {
+            color: #f44336;
+        }
+
+        .history-card-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid rgba(255,255,255,0.06);
+        }
+
+        .history-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .history-empty {
+            text-align: center;
+            padding: 44px 18px;
+            border: 1px dashed rgba(255,255,255,0.08);
+            border-radius: 10px;
+            color: #888;
+            background: rgba(255,255,255,0.025);
+        }
+
         .btn-danger {
             background: rgba(244, 67, 54, 0.12);
             color: #ff6b6b;
@@ -1014,6 +1170,32 @@
             .compact-actions {
                 justify-content: flex-start;
                 text-align: left;
+            }
+
+            .history-tabs {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                width: 100%;
+            }
+
+            .history-card-header,
+            .history-card-footer {
+                align-items: stretch;
+                flex-direction: column;
+            }
+
+            .history-total {
+                text-align: left;
+            }
+
+            .history-actions {
+                justify-content: stretch;
+            }
+
+            .history-actions .btn-secondary,
+            .history-actions .btn-danger {
+                flex: 1;
+                justify-content: center;
             }
 
             .compact-actions .btn-danger,
@@ -1728,8 +1910,17 @@
         <!-- ===== ABA HISTÓRICO ===== -->
         <section id="historico" class="tab-content">
             <div class="page-header">
-                <h2><i class="fas fa-history"></i> Histórico de Vendas</h2>
-                <p class="subtitle">Visualize, edite ou cancele vendas registradas.</p>
+                <h2><i class="fas fa-history"></i> Histórico de Movimentações</h2>
+                <p class="subtitle">Acompanhe o que saiu, o que entrou e quando cada movimentação aconteceu.</p>
+            </div>
+
+            <div class="history-tabs">
+                <button type="button" class="history-tab active" data-historico-tipo="vendas">
+                    <i class="fas fa-cash-register"></i> Vendas
+                </button>
+                <button type="button" class="history-tab" data-historico-tipo="compras">
+                    <i class="fas fa-cart-shopping"></i> Compras
+                </button>
             </div>
 
             <div class="filtros-area">
@@ -1743,20 +1934,21 @@
                     </select>
                 </div>
                 <div class="filtro-group">
-                    <label><i class="fas fa-search"></i> Buscar por cliente:</label>
-                    <input type="text" id="filtroClienteHistorico" placeholder="Digite o nome...">
+                    <label><i class="fas fa-search"></i> Buscar:</label>
+                    <input type="text" id="filtroClienteHistorico" placeholder="Produto, marca, cliente, sabor...">
                 </div>
                 <div class="filtro-group" style="display:flex; align-items:flex-end;">
                     <button id="aplicarFiltrosHistorico" class="btn-secondary"><i class="fas fa-filter"></i> Aplicar</button>
                 </div>
             </div>
 
+            <div id="historicoResumo" class="history-summary-panel"></div>
             <div id="historicoLista" class="lista-items"></div>
         </section>
     </main>
 
     <!-- SCRIPTS -->
-    <script type="module" src="firebase-config.js?v=20260808-10"></script>
-    <script type="module" src="script.js?v=20260808-10"></script>
+    <script type="module" src="firebase-config.js?v=20260813-1"></script>
+    <script type="module" src="script.js?v=20260813-1"></script>
 </body>
 </html>
