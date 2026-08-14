@@ -7,6 +7,29 @@ const loteId = urlParams.get('id');
 let loteAtual = null;
 let currentUser = null;
 
+function converterNumero(valor) {
+    if (typeof valor === 'number') {
+        return Number.isFinite(valor) ? valor : 0;
+    }
+
+    if (typeof valor !== 'string') return 0;
+
+    const limpo = valor.replace(/[^\d,.-]/g, '').trim();
+    if (!limpo) return 0;
+
+    const normalizado = limpo.includes(',')
+        ? limpo.replace(/\./g, '').replace(',', '.')
+        : limpo;
+    const numero = parseFloat(normalizado);
+    return Number.isFinite(numero) ? numero : 0;
+}
+
+function calcularSaldoLote(lote) {
+    const quantidade = converterNumero(lote?.quantidade);
+    const vendido = converterNumero(lote?.vendido);
+    return Math.max(0, quantidade - vendido);
+}
+
 document.addEventListener('DOMContentLoaded', async function() {
     if (!loteId) {
         document.getElementById('message').innerHTML = '❌ Lote não identificado.';
@@ -33,7 +56,7 @@ function configurarEventos() {
     
     document.getElementById('editarForm').addEventListener('submit', salvarAlteracoes);
     document.getElementById('voltarBtn').addEventListener('click', () => {
-        window.location.href = 'dashboard.html';
+        window.location.href = 'dashboard.html?v=20260813-3';
     });
     document.getElementById('cancelarCompraBtn').addEventListener('click', cancelarLote);
     document.getElementById('excluirProdutoBtn').addEventListener('click', excluirLote);
@@ -43,7 +66,7 @@ function configurarEventos() {
     });
     
     document.getElementById('valorUnitario').addEventListener('input', function() {
-        const custo = parseFloat(this.value) || 0;
+        const custo = converterNumero(this.value);
         document.getElementById('simulacao40').value = (custo * 1.4).toFixed(2);
     });
 }
@@ -69,7 +92,7 @@ async function carregarLote() {
         }
         
         loteAtual = docSnap.data();
-        const saldo = loteAtual.quantidade - loteAtual.vendido;
+        const saldo = calcularSaldoLote(loteAtual);
         
         document.getElementById('produtoTitulo').innerHTML = `
             <strong>${loteAtual.marca} - ${loteAtual.produto}</strong><br>
@@ -82,8 +105,8 @@ async function carregarLote() {
         document.getElementById('peso').value = loteAtual.peso || '';
         document.getElementById('sabor').value = loteAtual.sabor || '';
         document.getElementById('familia').value = loteAtual.familia || '';
-        document.getElementById('valorUnitario').value = loteAtual.custoUnitario || 0;
-        document.getElementById('valorSugerido').value = loteAtual.valorSugerido || '';
+        document.getElementById('valorUnitario').value = converterNumero(loteAtual.custoUnitario) || 0;
+        document.getElementById('valorSugerido').value = converterNumero(loteAtual.valorSugerido) || '';
         document.getElementById('quantidadeEstoque').value = saldo;
         
         const imagemUrl = loteAtual.imagemUrl || '';
@@ -104,13 +127,17 @@ async function salvarAlteracoes(event) {
     event.preventDefault();
     
     try {
-        const custoUnitario = parseFloat(document.getElementById('valorUnitario').value);
-        const valorSugerido = parseFloat(document.getElementById('valorSugerido').value);
+        const custoUnitario = converterNumero(document.getElementById('valorUnitario').value);
+        const valorSugerido = converterNumero(document.getElementById('valorSugerido').value);
         const quantidade = parseInt(document.getElementById('quantidadeEstoque').value);
         const dataCompra = document.getElementById('dataCompra').value;
         const imagemUrl = document.getElementById('imagemProduto').value.trim() || '';
+
+        if (!Number.isFinite(quantidade) || quantidade < 0) {
+            throw new Error('Informe um saldo disponível válido.');
+        }
         
-        const vendido = loteAtual.vendido || 0;
+        const vendido = converterNumero(loteAtual.vendido);
         const novaQuantidadeTotal = quantidade + vendido;
         
         const atualizacao = {
@@ -121,7 +148,7 @@ async function salvarAlteracoes(event) {
             familia: document.getElementById('familia').value,
             custoUnitario: custoUnitario,
             simulacao40: custoUnitario * 1.4,
-            valorSugerido: isNaN(valorSugerido) ? null : valorSugerido,
+            valorSugerido: valorSugerido > 0 ? valorSugerido : null,
             quantidade: novaQuantidadeTotal,
             dataCompra: dataCompra,
             imagemUrl: imagemUrl,
@@ -135,7 +162,7 @@ async function salvarAlteracoes(event) {
         document.getElementById('message').className = 'message sucesso';
         
         setTimeout(() => {
-            window.location.href = 'dashboard.html';
+            window.location.href = 'dashboard.html?v=20260813-3';
         }, 1500);
         
     } catch (error) {
@@ -147,7 +174,7 @@ async function salvarAlteracoes(event) {
 async function cancelarLote() {
     const quantidadeCancelar = parseInt(document.getElementById('quantidadeCancelar').value);
     const motivo = document.getElementById('motivoCancelamento').value;
-    const saldo = loteAtual.quantidade - loteAtual.vendido;
+    const saldo = calcularSaldoLote(loteAtual);
     
     if (!quantidadeCancelar || quantidadeCancelar <= 0) {
         document.getElementById('message').innerHTML = 'Digite uma quantidade válida.';
@@ -173,13 +200,14 @@ async function cancelarLote() {
             }
 
             const lote = docSnap.data();
-            const saldoAtual = (lote.quantidade || 0) - (lote.vendido || 0);
+            const saldoAtual = calcularSaldoLote(lote);
             if (quantidadeCancelar > saldoAtual) {
                 throw new Error(`Saldo insuficiente! Disponível agora: ${saldoAtual} unidades.`);
             }
 
             const novoSaldo = saldoAtual - quantidadeCancelar;
-            const novaQuantidadeTotal = (lote.quantidade || 0) - quantidadeCancelar;
+            const novaQuantidadeTotal = converterNumero(lote.quantidade) - quantidadeCancelar;
+            const custoUnitario = converterNumero(lote.custoUnitario);
 
             transaction.update(docRef, {
                 quantidade: novaQuantidadeTotal,
@@ -194,8 +222,8 @@ async function cancelarLote() {
                 sabor: lote.sabor || '',
                 peso: lote.peso || '',
                 quantidade: quantidadeCancelar,
-                valorUnitario: lote.custoUnitario,
-                valorTotal: lote.custoUnitario * quantidadeCancelar,
+                valorUnitario: custoUnitario,
+                valorTotal: custoUnitario * quantidadeCancelar,
                 motivo: motivo,
                 data: new Date().toISOString(),
                 tipo: 'cancelamento_lote',
@@ -207,7 +235,7 @@ async function cancelarLote() {
         document.getElementById('message').className = 'message sucesso';
         
         setTimeout(() => {
-            window.location.href = 'dashboard.html';
+            window.location.href = 'dashboard.html?v=20260813-3';
         }, 1500);
         
     } catch (error) {
@@ -217,9 +245,9 @@ async function cancelarLote() {
 }
 
 async function excluirLote() {
-    const saldo = loteAtual.quantidade - loteAtual.vendido;
+    const saldo = calcularSaldoLote(loteAtual);
 
-    if ((loteAtual.vendido || 0) > 0) {
+    if (converterNumero(loteAtual.vendido) > 0) {
         document.getElementById('message').innerHTML = '❌ Este lote já possui vendas registradas. Para manter o histórico correto, cancele apenas o saldo restante em vez de excluir o lote.';
         document.getElementById('message').className = 'message erro';
         return;
@@ -238,7 +266,7 @@ async function excluirLote() {
     try {
         await window.deleteDoc(window.doc(window.db, 'lotes', loteId));
         alert('✅ Lote excluído permanentemente!');
-        window.location.href = 'dashboard.html';
+        window.location.href = 'dashboard.html?v=20260813-3';
     } catch (error) {
         document.getElementById('message').innerHTML = '❌ Erro ao excluir: ' + error.message;
         document.getElementById('message').className = 'message erro';

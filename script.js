@@ -97,6 +97,12 @@ function converterNumero(valor) {
     return Number.isFinite(numero) ? numero : 0;
 }
 
+function calcularSaldoLote(lote) {
+    const quantidade = converterNumero(lote?.quantidade);
+    const vendido = converterNumero(lote?.vendido);
+    return Math.max(0, quantidade - vendido);
+}
+
 function converterData(valor) {
     if (!valor) return null;
     if (valor instanceof Date) return valor;
@@ -329,16 +335,15 @@ async function buscarLotesDisponiveisPorProduto(produtoSelecionado) {
 
     const q = window.query(
         window.collection(window.db, 'lotes'),
-        window.where('produto', '==', produtoSelecionado.produto),
-        window.where('ativo', '==', true)
+        window.where('produto', '==', produtoSelecionado.produto)
     );
     const snapshot = await window.getDocs(q);
     const lotes = [];
 
     snapshot.forEach(docSnap => {
         const lote = docSnap.data();
-        const saldo = (lote.quantidade || 0) - (lote.vendido || 0);
-        if (saldo > 0 && loteCorrespondeProduto(lote, produtoSelecionado)) {
+        const saldo = calcularSaldoLote(lote);
+        if (saldo > 0 && lote.ativo !== false && loteCorrespondeProduto(lote, produtoSelecionado)) {
             lotes.push({
                 id: docSnap.id,
                 ref: docSnap.ref,
@@ -983,8 +988,8 @@ async function registrarVenda(event) {
                 if (!loteSnap.exists()) continue;
 
                 const lote = loteSnap.data();
-                const saldo = (lote.quantidade || 0) - (lote.vendido || 0);
-                if (saldo > 0 && lote.ativo === true && loteCorrespondeProduto(lote, produtoSelecionado)) {
+                const saldo = calcularSaldoLote(lote);
+                if (saldo > 0 && lote.ativo !== false && loteCorrespondeProduto(lote, produtoSelecionado)) {
                     lotesDisponiveis.push({
                         id: loteSnap.id,
                         ref: candidato.ref,
@@ -1009,19 +1014,22 @@ async function registrarVenda(event) {
                 if (quantidadeRestante <= 0) break;
 
                 const usar = Math.min(quantidadeRestante, lote.saldo);
-                custoTotal += usar * lote.custoUnitario;
+                const custoUnitarioLote = converterNumero(lote.custoUnitario);
+                const quantidadeTotalLote = converterNumero(lote.quantidade);
+                const vendidoAtualLote = converterNumero(lote.vendido);
+                custoTotal += usar * custoUnitarioLote;
 
                 lotesUtilizados.push({
                     loteId: lote.id,
                     quantidade: usar,
-                    custoUnitario: lote.custoUnitario,
+                    custoUnitario: custoUnitarioLote,
                     dataCompra: lote.dataCompra
                 });
 
-                const novoVendido = (lote.vendido || 0) + usar;
+                const novoVendido = vendidoAtualLote + usar;
                 transaction.update(lote.ref, {
                     vendido: novoVendido,
-                    ativo: novoVendido < lote.quantidade
+                    ativo: novoVendido < quantidadeTotalLote
                 });
 
                 quantidadeRestante -= usar;
@@ -1122,7 +1130,10 @@ async function registrarPerda(event) {
             }
 
             const lote = docSnap.data();
-            const saldo = (lote.quantidade || 0) - (lote.vendido || 0);
+            const saldo = calcularSaldoLote(lote);
+            const custoUnitario = converterNumero(lote.custoUnitario);
+            const quantidadeTotal = converterNumero(lote.quantidade);
+            const vendidoAtual = converterNumero(lote.vendido);
 
             if (saldo < quantidade) {
                 throw new Error(`Saldo insuficiente! Disponível: ${saldo} unidades.`);
@@ -1134,8 +1145,8 @@ async function registrarPerda(event) {
                 sabor: lote.sabor,
                 peso: lote.peso,
                 quantidade: quantidade,
-                valorUnitario: lote.custoUnitario,
-                valorTotal: lote.custoUnitario * quantidade,
+                valorUnitario: custoUnitario,
+                valorTotal: custoUnitario * quantidade,
                 motivo: motivo,
                 data: new Date().toISOString(),
                 registradoPor: currentUser?.email,
@@ -1145,10 +1156,10 @@ async function registrarPerda(event) {
             const perdaRef = window.doc(window.collection(window.db, 'perdas'));
             transaction.set(perdaRef, perda);
 
-            const novoVendido = (lote.vendido || 0) + quantidade;
+            const novoVendido = vendidoAtual + quantidade;
             transaction.update(docRef, {
                 vendido: novoVendido,
-                ativo: novoVendido < lote.quantidade
+                ativo: novoVendido < quantidadeTotal
             });
         });
 
@@ -1400,7 +1411,7 @@ async function calcularPosicaoFinanceiraGeral() {
 
     lotesSnapshot.forEach(docSnap => {
         const lote = docSnap.data();
-        const saldo = converterNumero(lote.quantidade) - converterNumero(lote.vendido);
+        const saldo = calcularSaldoLote(lote);
         if (saldo > 0) {
             valorEstoque += saldo * converterNumero(lote.custoUnitario);
             totalUnidadesEstoque += saldo;
@@ -2080,8 +2091,8 @@ async function carregarEstoqueLotes() {
         const produtos = {};
         snapshot.forEach(doc => {
             const l = doc.data();
-            const saldo = l.quantidade - l.vendido;
-            if (saldo <= 0) return;
+            const saldo = calcularSaldoLote(l);
+            if (saldo <= 0 || l.ativo === false) return;
 
             if (filtroMarca && l.marca !== filtroMarca) return;
             if (filtroFamilia && l.familia !== filtroFamilia) return;
@@ -2113,16 +2124,17 @@ async function carregarEstoqueLotes() {
             produtos[chave].lotes.push({
                 id: doc.id,
                 dataCompra: l.dataCompra,
-                quantidade: l.quantidade,
-                vendido: l.vendido,
+                quantidade: converterNumero(l.quantidade),
+                vendido: converterNumero(l.vendido),
                 saldo: saldo,
-                custoUnitario: l.custoUnitario,
-                valorSugerido: l.valorSugerido,
-                simulacao40: l.simulacao40 || l.custoUnitario * 1.4
+                custoUnitario: converterNumero(l.custoUnitario),
+                valorSugerido: converterNumero(l.valorSugerido),
+                simulacao40: converterNumero(l.simulacao40) || converterNumero(l.custoUnitario) * 1.4
             });
             produtos[chave].totalDisponivel += saldo;
-            if (l.valorSugerido && !produtos[chave].valorSugerido) {
-                produtos[chave].valorSugerido = l.valorSugerido;
+            const valorSugeridoLote = converterNumero(l.valorSugerido);
+            if (valorSugeridoLote > 0 && !produtos[chave].valorSugerido) {
+                produtos[chave].valorSugerido = valorSugeridoLote;
             }
         });
 
@@ -2169,8 +2181,8 @@ async function carregarEstoqueLotes() {
 
                 if (modoInternoAtivo) {
     // ===== MODO INTERNO - VISUAL MODERNO =====
-    const lucroTotalGeral = p.lotes.reduce((acc, l) => acc + ((l.valorSugerido || 0) - l.custoUnitario) * l.quantidade, 0);
-    const custoTotalGeral = p.lotes.reduce((acc, l) => acc + l.custoUnitario * l.quantidade, 0);
+    const lucroTotalGeral = p.lotes.reduce((acc, l) => acc + ((l.valorSugerido || 0) - l.custoUnitario) * l.saldo, 0);
+    const custoTotalGeral = p.lotes.reduce((acc, l) => acc + l.custoUnitario * l.saldo, 0);
     const margemMedia = p.lotes.reduce((acc, l) => acc + ((l.valorSugerido || 0) - l.custoUnitario) / (l.valorSugerido || 1) * 100, 0) / p.lotes.length;
 
     html += `
@@ -2233,7 +2245,7 @@ async function carregarEstoqueLotes() {
             <div style="display:grid; gap:12px; margin-bottom:16px;">
                 <div style="display:grid; grid-template-columns: 1fr 0.5fr 0.8fr 1fr 1fr; gap:6px; font-size:10px; color:#666; text-transform:uppercase; letter-spacing:0.5px; padding:0 4px 6px 4px; border-bottom:1px solid rgba(255,255,255,0.05);">
                     <span><i class="far fa-calendar-alt" style="margin-right:4px;"></i> Lote</span>
-                    <span style="text-align:center;"><i class="fas fa-box" style="margin-right:4px;"></i> Qtd</span>
+                    <span style="text-align:center;"><i class="fas fa-box" style="margin-right:4px;"></i> Disp.</span>
                     <span style="text-align:right;"><i class="fas fa-tag" style="margin-right:4px;"></i> Custo</span>
                     <span style="text-align:right;"><i class="fas fa-coins" style="margin-right:4px;"></i> Custo Total</span>
                     <span style="text-align:right;"><i class="fas fa-chart-line" style="margin-right:4px;"></i> Lucro Total</span>
@@ -2241,9 +2253,9 @@ async function carregarEstoqueLotes() {
     `;
 
     p.lotes.forEach(lote => {
-        const custoTotal = lote.custoUnitario * lote.quantidade;
+        const custoTotal = lote.custoUnitario * lote.saldo;
         const lucroUnitario = lote.valorSugerido ? (lote.valorSugerido - lote.custoUnitario) : 0;
-        const lucroTotalLote = lucroUnitario * lote.quantidade;
+        const lucroTotalLote = lucroUnitario * lote.saldo;
         const margem = lote.valorSugerido ? ((lote.valorSugerido - lote.custoUnitario) / lote.valorSugerido * 100) : 0;
 
         html += `
@@ -2259,7 +2271,7 @@ async function carregarEstoqueLotes() {
             >
                 <div style="display:grid; grid-template-columns: 1fr 0.5fr 0.8fr 1fr 1fr; gap:6px; align-items:center;">
                     <span style="color:#ccc; font-weight:600; font-size:13px;">${lote.dataCompra}</span>
-                    <span style="text-align:center; color:#4caf50; font-weight:700; font-size:15px;">${lote.quantidade}</span>
+                    <span style="text-align:center; color:#4caf50; font-weight:700; font-size:15px;">${lote.saldo}</span>
                     <span style="text-align:right; color:#ff9800; font-weight:500;">R$ ${lote.custoUnitario.toFixed(2)}</span>
                     <span style="text-align:right; color:#ff9800; font-weight:600;">R$ ${custoTotal.toFixed(2)}</span>
                     <span style="text-align:right; color:#4caf50; font-weight:700; font-size:15px;">R$ ${lucroTotalLote.toFixed(2)}</span>
@@ -2275,7 +2287,7 @@ async function carregarEstoqueLotes() {
                     </span>
                     <span style="font-size:12px; color:#888;">
                         <i class="fas fa-calendar-alt" style="color:#666; margin-right:4px;"></i>
-                        Vendido: <strong style="color:#aaa;">${lote.vendido}</strong>
+                        Comprado: <strong style="color:#aaa;">${lote.quantidade}</strong> · Vendido: <strong style="color:#aaa;">${lote.vendido}</strong>
                     </span>
                 </div>
             </div>
@@ -2315,7 +2327,7 @@ async function carregarEstoqueLotes() {
             </div>
 
             <!-- BOTÃO EDITAR -->
-            <button onclick="window.location.href='editar-produto.html?id=${p.lotes[0].id}'" style="
+            <button onclick="window.location.href='editar-produto.html?id=${p.lotes[0].id}&v=20260813-3'" style="
                 margin-top:14px;
                 width:100%;
                 background: rgba(245, 166, 35, 0.08);
@@ -2382,7 +2394,7 @@ async function carregarEstoqueLotes() {
                             </div>
 
                             <div style="margin-top:10px; width:100%;">
-                                <button onclick="window.location.href='editar-produto.html?id=${p.lotes[0].id}'" style="
+                                <button onclick="window.location.href='editar-produto.html?id=${p.lotes[0].id}&v=20260813-3'" style="
                                     background: rgba(245, 166, 35, 0.1);
                                     border: 1px solid rgba(245, 166, 35, 0.15);
                                     color: #F5A623;
@@ -2448,8 +2460,8 @@ function preencherFiltros(snapshot) {
 
     snapshot.forEach(doc => {
         const l = doc.data();
-        const saldo = l.quantidade - l.vendido;
-        if (saldo > 0) {
+        const saldo = calcularSaldoLote(l);
+        if (saldo > 0 && l.ativo !== false) {
             if (l.marca) marcas.add(l.marca);
             if (l.familia) familias.add(l.familia);
         }
@@ -2488,8 +2500,8 @@ async function carregarSelectProdutos() {
         const produtos = {};
         snapshot.forEach(doc => {
             const l = doc.data();
-            const saldo = l.quantidade - l.vendido;
-            if (saldo <= 0) return;
+            const saldo = calcularSaldoLote(l);
+            if (saldo <= 0 || l.ativo === false) return;
 
             const chave = criarChaveProdutoDoLote(l);
             if (!produtos[chave]) {
@@ -2522,8 +2534,8 @@ async function carregarSelectProdutos() {
             const lotesSnapshot = await window.getDocs(window.collection(window.db, 'lotes'));
             lotesSnapshot.forEach(doc => {
                 const l = doc.data();
-                const saldo = l.quantidade - l.vendido;
-                if (saldo > 0) {
+                const saldo = calcularSaldoLote(l);
+                if (saldo > 0 && l.ativo !== false) {
                     const option = document.createElement('option');
                     option.value = doc.id;
                     option.textContent = `${l.marca} - ${l.produto} (${l.peso}) - ${l.sabor} - Saldo: ${saldo}`;
@@ -3237,7 +3249,7 @@ async function carregarRelatorio() {
 
         lotesSnapshot.forEach(doc => {
             const l = doc.data();
-            const saldo = converterNumero(l.quantidade) - converterNumero(l.vendido);
+            const saldo = calcularSaldoLote(l);
             if (saldo > 0) {
                 valorEstoque += saldo * converterNumero(l.custoUnitario);
                 totalUnidadesEstoque += saldo;
@@ -3460,11 +3472,13 @@ window.cancelarVenda = async function(vendaId) {
                     const loteSnap = await transaction.get(loteRef);
                     if (loteSnap.exists()) {
                         const loteData = loteSnap.data();
-                        const novoVendido = Math.max(0, (loteData.vendido || 0) - lote.quantidade);
+                        const quantidadeDevolvida = converterNumero(lote.quantidade);
+                        const quantidadeTotalLote = converterNumero(loteData.quantidade);
+                        const novoVendido = Math.max(0, converterNumero(loteData.vendido) - quantidadeDevolvida);
                         atualizacoesLotes.push({
                             ref: loteRef,
                             vendido: novoVendido,
-                            ativo: novoVendido < loteData.quantidade
+                            ativo: novoVendido < quantidadeTotalLote
                         });
                     }
                 }
