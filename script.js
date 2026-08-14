@@ -2496,7 +2496,7 @@ async function carregarEstoqueLotes() {
             </div>
 
             <!-- BOTÃO EDITAR -->
-            <button onclick="window.location.href='editar-produto.html?id=${p.lotes[0].id}&v=20260814-1'" style="
+            <button onclick="window.location.href='editar-produto.html?id=${p.lotes[0].id}&v=20260814-2'" style="
                 margin-top:14px;
                 width:100%;
                 background: rgba(245, 166, 35, 0.08);
@@ -2563,7 +2563,7 @@ async function carregarEstoqueLotes() {
                             </div>
 
                             <div style="margin-top:10px; width:100%;">
-                                <button onclick="window.location.href='editar-produto.html?id=${p.lotes[0].id}&v=20260814-1'" style="
+                                <button onclick="window.location.href='editar-produto.html?id=${p.lotes[0].id}&v=20260814-2'" style="
                                     background: rgba(245, 166, 35, 0.1);
                                     border: 1px solid rgba(245, 166, 35, 0.15);
                                     color: #F5A623;

@@ -56,9 +56,10 @@ function configurarEventos() {
     
     document.getElementById('editarForm').addEventListener('submit', salvarAlteracoes);
     document.getElementById('voltarBtn').addEventListener('click', () => {
-        window.location.href = 'dashboard.html?v=20260813-3';
+        window.location.href = 'dashboard.html?v=20260814-2';
     });
     document.getElementById('cancelarCompraBtn').addEventListener('click', cancelarLote);
+    document.getElementById('ocultarEstoqueBtn')?.addEventListener('click', ocultarLoteDoEstoque);
     document.getElementById('excluirProdutoBtn').addEventListener('click', excluirLote);
     
     document.getElementById('imagemProduto').addEventListener('input', function() {
@@ -162,7 +163,7 @@ async function salvarAlteracoes(event) {
         document.getElementById('message').className = 'message sucesso';
         
         setTimeout(() => {
-            window.location.href = 'dashboard.html?v=20260813-3';
+            window.location.href = 'dashboard.html?v=20260814-2';
         }, 1500);
         
     } catch (error) {
@@ -235,7 +236,7 @@ async function cancelarLote() {
         document.getElementById('message').className = 'message sucesso';
         
         setTimeout(() => {
-            window.location.href = 'dashboard.html?v=20260813-3';
+            window.location.href = 'dashboard.html?v=20260814-2';
         }, 1500);
         
     } catch (error) {
@@ -244,8 +245,72 @@ async function cancelarLote() {
     }
 }
 
+async function ocultarLoteDoEstoque() {
+    const saldo = calcularSaldoLote(loteAtual);
+    const confirmar = confirm(`Remover este lote do estoque?\n\n${loteAtual.marca} - ${loteAtual.produto}\nSaldo atual: ${saldo} unidade(s)\n\nIsso zera o saldo e tira o produto do estoque, mas preserva o histórico de vendas/compras.`);
+
+    if (!confirmar) return;
+
+    try {
+        const docRef = window.doc(window.db, 'lotes', loteId);
+        await window.runTransaction(window.db, async (transaction) => {
+            const docSnap = await transaction.get(docRef);
+            if (!docSnap.exists()) {
+                throw new Error('Lote não encontrado.');
+            }
+
+            const lote = docSnap.data();
+            const saldoAtual = calcularSaldoLote(lote);
+            const vendidoAtual = converterNumero(lote.vendido);
+            const custoUnitario = converterNumero(lote.custoUnitario);
+            const dataRemocao = new Date().toISOString();
+
+            transaction.update(docRef, {
+                quantidade: vendidoAtual,
+                ativo: false,
+                removidoDoEstoque: true,
+                dataRemocaoEstoque: dataRemocao,
+                removidoPor: currentUser?.email || 'desconhecido'
+            });
+
+            const cancelamentoRef = window.doc(window.collection(window.db, 'cancelamentos'));
+            transaction.set(cancelamentoRef, {
+                loteId: loteId,
+                produto: lote.produto,
+                marca: lote.marca,
+                sabor: lote.sabor || '',
+                peso: lote.peso || '',
+                quantidade: saldoAtual,
+                valorUnitario: custoUnitario,
+                valorTotal: custoUnitario * saldoAtual,
+                motivo: 'Remoção manual do estoque',
+                data: dataRemocao,
+                tipo: 'remocao_estoque',
+                registradoPor: currentUser?.email || 'desconhecido'
+            });
+        });
+
+        document.getElementById('message').innerHTML = '✅ Produto removido do estoque. O histórico foi preservado.';
+        document.getElementById('message').className = 'message sucesso';
+
+        setTimeout(() => {
+            window.location.href = 'dashboard.html?v=20260814-2';
+        }, 1500);
+    } catch (error) {
+        document.getElementById('message').innerHTML = '❌ Erro ao remover do estoque: ' + error.message;
+        document.getElementById('message').className = 'message erro';
+    }
+}
+
 async function excluirLote() {
     const saldo = calcularSaldoLote(loteAtual);
+
+    if (converterNumero(loteAtual.vendido) > 0) {
+        document.getElementById('message').innerHTML = 'Este lote tem histórico. Remova do estoque para ele sumir sem apagar as vendas antigas.';
+        document.getElementById('message').className = 'message aviso';
+        await ocultarLoteDoEstoque();
+        return;
+    }
 
     if (converterNumero(loteAtual.vendido) > 0) {
         document.getElementById('message').innerHTML = '❌ Este lote já possui vendas registradas. Para manter o histórico correto, cancele apenas o saldo restante em vez de excluir o lote.';
@@ -266,7 +331,7 @@ async function excluirLote() {
     try {
         await window.deleteDoc(window.doc(window.db, 'lotes', loteId));
         alert('✅ Lote excluído permanentemente!');
-        window.location.href = 'dashboard.html?v=20260813-3';
+        window.location.href = 'dashboard.html?v=20260814-2';
     } catch (error) {
         document.getElementById('message').innerHTML = '❌ Erro ao excluir: ' + error.message;
         document.getElementById('message').className = 'message erro';

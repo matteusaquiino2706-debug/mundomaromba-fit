@@ -186,6 +186,27 @@
             background: rgba(244, 67, 54, 0.25);
         }
 
+        .btn-ocultar {
+            background: rgba(245, 166, 35, 0.12);
+            color: #F5A623;
+            border: 1px solid rgba(245, 166, 35, 0.22);
+            padding: 14px 32px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: 'Inter', sans-serif;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-right: 8px;
+            margin-top: 10px;
+        }
+
+        .btn-ocultar:hover {
+            background: rgba(245, 166, 35, 0.2);
+        }
+
         .cancelar-box {
             margin-top: 30px;
             padding-top: 20px;
@@ -240,6 +261,12 @@
             background: rgba(76, 175, 80, 0.15);
             border: 1px solid rgba(76, 175, 80, 0.2);
             color: #4caf50;
+        }
+
+        .message.aviso {
+            background: rgba(245, 166, 35, 0.12);
+            border: 1px solid rgba(245, 166, 35, 0.22);
+            color: #F5A623;
         }
 
         .message.erro {
@@ -456,6 +483,10 @@
                 </select>
             </div>
 
+            <button type="button" id="ocultarEstoqueBtn" class="btn-ocultar">
+                <i class="fas fa-box-archive"></i> Remover do Estoque
+            </button>
+
             <button type="button" id="excluirProdutoBtn" class="btn-excluir" style="margin-top:10px;">
                 <i class="fas fa-trash"></i> Excluir Lote (cuidado!)
             </button>
@@ -464,7 +495,7 @@
         <div id="message" class="message"></div>
     </div>
 
-    <script type="module" src="firebase-config.js?v=20260813-3"></script>
-    <script type="module" src="editar-produto.js?v=20260813-3"></script>
+    <script type="module" src="firebase-config.js?v=20260814-2"></script>
+    <script type="module" src="editar-produto.js?v=20260814-2"></script>
 </body>
 </html>
