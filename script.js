@@ -2777,6 +2777,22 @@ function formatarDataHoraHistorico(valor) {
     return `${data.toLocaleDateString('pt-BR')} ${data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
 }
 
+function formatarDataHistorico(valor) {
+    const data = converterData(valor);
+    if (!data) return '-';
+    return data.toLocaleDateString('pt-BR');
+}
+
+function renderizarDetalheHistorico(icone, label, valor) {
+    const texto = valor === undefined || valor === null || valor === '' ? '-' : valor;
+    return `
+        <div class="history-detail">
+            <label><i class="${icone}"></i> ${escaparHtml(label)}</label>
+            <strong>${escaparHtml(texto)}</strong>
+        </div>
+    `;
+}
+
 function renderizarResumoHistorico(itens) {
     return `
         <div class="mini-stat">
@@ -2871,6 +2887,11 @@ async function carregarHistoricoVendas() {
             const parcelas = converterNumero(v.parcelas);
             const valorVenda = converterNumero(v.valorTotal);
             const valorLiquido = v.valorLiquido !== undefined ? converterNumero(v.valorLiquido) : valorVenda;
+            const taxaValor = converterNumero(v.taxaValor);
+            const descontoTotal = converterNumero(v.descontoTotal);
+            const custoTotal = converterNumero(v.custoTotal);
+            const lucro = v.lucro !== undefined ? converterNumero(v.lucro) : valorLiquido - custoTotal;
+            const formaPagamento = `${pagamento}${parcelas > 1 ? ` ${parcelas}x` : ''}`;
 
             html += `
                 <div class="history-card ${isCancelada ? 'cancelada' : ''}">
@@ -2882,19 +2903,29 @@ async function carregarHistoricoVendas() {
                             </div>
                             <div class="history-meta">
                                 ${detalhesProduto ? `${escaparHtml(detalhesProduto)} · ` : ''}
-                                ${converterNumero(v.quantidade)} un. · ${escaparHtml(pagamento)}${parcelas > 1 ? ` ${parcelas}x` : ''}
+                                ${converterNumero(v.quantidade)} un. · ${escaparHtml(formaPagamento)}
                             </div>
                         </div>
                         <div>
                             <div class="history-total ${isCancelada ? 'cancelada' : ''}">${formatarMoeda(valorVenda)}</div>
-                            <div class="history-meta" style="text-align:right;">${formatarDataHoraHistorico(v.data)}</div>
+                            <div class="history-meta" style="text-align:right;">Data da venda</div>
                         </div>
+                    </div>
+                    <div class="history-detail-grid">
+                        ${renderizarDetalheHistorico('far fa-calendar-alt', 'Data da venda', formatarDataHoraHistorico(v.data))}
+                        ${renderizarDetalheHistorico('fas fa-user', 'Cliente', v.cliente || 'Cliente não identificado')}
+                        ${renderizarDetalheHistorico('fas fa-credit-card', 'Pagamento', formaPagamento)}
+                        ${renderizarDetalheHistorico('fas fa-box', 'Quantidade', `${converterNumero(v.quantidade)} un.`)}
+                        ${renderizarDetalheHistorico('fas fa-calculator', 'Valor líquido', isCancelada ? 'Venda cancelada' : formatarMoeda(valorLiquido))}
+                        ${renderizarDetalheHistorico('fas fa-coins', 'Custo / lucro', isCancelada ? '-' : `${formatarMoeda(custoTotal)} / ${formatarMoeda(lucro)}`)}
+                        ${renderizarDetalheHistorico('fas fa-percent', 'Taxa', isCancelada ? '-' : formatarMoeda(taxaValor))}
+                        ${renderizarDetalheHistorico('fas fa-tags', 'Desconto', isCancelada ? '-' : formatarMoeda(descontoTotal))}
                     </div>
                     <div class="history-card-footer">
                         <div class="history-meta">
-                            <i class="fas fa-user"></i> ${escaparHtml(v.cliente || 'Cliente não identificado')}
+                            <i class="fas fa-clock"></i> ${formatarDataHoraHistorico(v.data)}
                             ${v.contato ? ` · <i class="fas fa-phone"></i> ${escaparHtml(v.contato)}` : ''}
-                            ${!isCancelada ? ` · líquido ${formatarMoeda(valorLiquido)}` : ''}
+                            ${v.vendedor ? ` · <i class="fas fa-user-tie"></i> ${escaparHtml(v.vendedor)}` : ''}
                         </div>
                         ${!isCancelada ? `
                         <div class="history-actions">
@@ -2987,6 +3018,9 @@ async function carregarHistoricoCompras() {
             const custoUnitario = converterNumero(c.custoUnitario) || (quantidade > 0 ? valorTotal / quantidade : 0);
             const valorSugerido = converterNumero(c.valorSugerido);
             const familia = c.familia || 'Outros';
+            const dataCompra = c.dataCompra || c.data || c.dataHistorico;
+            const dataRegistro = c.dataCriacao || c.dataHistorico;
+            const loteCurto = c.loteId ? c.loteId.slice(0, 8) : '-';
 
             html += `
                 <div class="history-card compra">
@@ -3003,14 +3037,24 @@ async function carregarHistoricoCompras() {
                         </div>
                         <div>
                             <div class="history-total compra">${formatarMoeda(valorTotal)}</div>
-                            <div class="history-meta" style="text-align:right;">${formatarDataHoraHistorico(c.dataHistorico)}</div>
+                            <div class="history-meta" style="text-align:right;">Data da compra</div>
                         </div>
+                    </div>
+                    <div class="history-detail-grid">
+                        ${renderizarDetalheHistorico('far fa-calendar-alt', 'Data da compra', formatarDataHistorico(dataCompra))}
+                        ${renderizarDetalheHistorico('fas fa-clock', 'Registrado em', formatarDataHoraHistorico(dataRegistro))}
+                        ${renderizarDetalheHistorico('fas fa-boxes-stacked', 'Quantidade entrada', `${quantidade} un.`)}
+                        ${renderizarDetalheHistorico('fas fa-layer-group', 'Família', familia)}
+                        ${renderizarDetalheHistorico('fas fa-coins', 'Custo unitário', formatarMoeda(custoUnitario))}
+                        ${renderizarDetalheHistorico('fas fa-money-bill-wave', 'Total pago', formatarMoeda(valorTotal))}
+                        ${renderizarDetalheHistorico('fas fa-tag', 'Venda sugerida', valorSugerido > 0 ? formatarMoeda(valorSugerido) : 'Não definida')}
+                        ${renderizarDetalheHistorico('fas fa-barcode', 'Lote', loteCurto)}
                     </div>
                     <div class="history-card-footer">
                         <div class="history-meta">
-                            custo ${formatarMoeda(custoUnitario)} un.
-                            ${valorSugerido > 0 ? ` · venda sugerida ${formatarMoeda(valorSugerido)}` : ''}
-                            ${c.loteId ? ` · lote ${escaparHtml(c.loteId.slice(0, 6))}` : ''}
+                            <i class="far fa-calendar-alt"></i> compra em ${formatarDataHistorico(dataCompra)}
+                            · registrado em ${formatarDataHoraHistorico(dataRegistro)}
+                            ${c.registradoPor ? ` · ${escaparHtml(c.registradoPor)}` : ''}
                         </div>
                         <div class="history-actions">
                             <button type="button" onclick="window.abrirEstoqueHistorico()" class="btn-secondary">

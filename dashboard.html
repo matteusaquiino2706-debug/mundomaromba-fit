@@ -663,6 +663,45 @@
             line-height: 1.5;
         }
 
+        .history-detail-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .history-detail {
+            min-height: 54px;
+            padding: 9px 10px;
+            border: 1px solid rgba(255,255,255,0.055);
+            border-radius: 8px;
+            background: rgba(0,0,0,0.14);
+        }
+
+        .history-detail label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: #777;
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 0.4px;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+
+        .history-detail label i {
+            color: #F5A623;
+        }
+
+        .history-detail strong {
+            color: #ddd;
+            font-size: 13px;
+            font-weight: 800;
+            line-height: 1.25;
+            word-break: break-word;
+        }
+
         .history-total {
             color: #4caf50;
             font-size: 18px;
@@ -1192,6 +1231,10 @@
                 justify-content: stretch;
             }
 
+            .history-detail-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+
             .history-actions .btn-secondary,
             .history-actions .btn-danger {
                 flex: 1;
@@ -1245,6 +1288,10 @@
             }
             .page-header h2 {
                 font-size: 16px !important;
+            }
+
+            .history-detail-grid {
+                grid-template-columns: 1fr;
             }
         }
     </style>
@@ -1948,7 +1995,7 @@
     </main>
 
     <!-- SCRIPTS -->
-    <script type="module" src="firebase-config.js?v=20260813-1"></script>
-    <script type="module" src="script.js?v=20260813-1"></script>
+    <script type="module" src="firebase-config.js?v=20260813-2"></script>
+    <script type="module" src="script.js?v=20260813-2"></script>
 </body>
 </html>
