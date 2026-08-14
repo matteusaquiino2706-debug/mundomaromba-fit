@@ -461,6 +461,8 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('filtroClienteHistorico')?.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') carregarHistoricoMovimentacoes();
         });
+        document.getElementById('copiarRelatorioVendasWhatsapp')?.addEventListener('click', () => copiarRelatorioHistoricoWhatsApp('vendas'));
+        document.getElementById('copiarRelatorioComprasWhatsapp')?.addEventListener('click', () => copiarRelatorioHistoricoWhatsApp('compras'));
 
         // Eventos para calcular preview
         document.getElementById('pagamentoVenda')?.addEventListener('change', function() {
@@ -2127,6 +2129,20 @@ function montarLinhaEstoqueMensagem(produto) {
     return `${quantidade}x - ${limparTextoMensagem(produto.produto)} - ${limparTextoMensagem(produto.sabor, 'Sem sabor')} - ${limparTextoMensagem(produto.marca)} - ${formatarValorMensagem(custo)} - ${formatarValorMensagem(venda)}`;
 }
 
+function calcularTotaisEstoqueMensagem(produtos) {
+    return produtos.reduce((totais, produto) => {
+        const quantidade = converterNumero(produto.totalDisponivel);
+        const custoMedio = calcularCustoMedioEstoque(produto.lotes);
+        const venda = obterValorVendaMensagem(produto);
+
+        totais.produtos += 1;
+        totais.unidades += quantidade;
+        totais.custo += quantidade * custoMedio;
+        totais.venda += quantidade * venda;
+        return totais;
+    }, { produtos: 0, unidades: 0, custo: 0, venda: 0 });
+}
+
 function montarMensagemEstoqueWhatsApp(produtos) {
     const grupos = {};
     produtos.forEach(produto => {
@@ -2134,10 +2150,15 @@ function montarMensagemEstoqueWhatsApp(produtos) {
         if (!grupos[familia]) grupos[familia] = [];
         grupos[familia].push(produto);
     });
+    const totais = calcularTotaisEstoqueMensagem(produtos);
 
     const linhas = [
         '📦 *ESTOQUE MUNDO MAROMBA* 📦',
-        `Atualizado em ${new Date().toLocaleDateString('pt-BR')}`
+        `Atualizado em ${new Date().toLocaleDateString('pt-BR')}`,
+        '',
+        `Resumo: ${totais.produtos} produto(s) | ${totais.unidades} un.`,
+        `Valor em estoque: ${formatarMoeda(totais.custo)}`,
+        `Valor se vender tudo: ${formatarMoeda(totais.venda)}`
     ];
 
     Object.keys(grupos).sort().forEach(familia => {
@@ -2148,6 +2169,14 @@ function montarMensagemEstoqueWhatsApp(produtos) {
             .sort((a, b) => `${a.produto} ${a.sabor} ${a.marca}`.localeCompare(`${b.produto} ${b.sabor} ${b.marca}`, 'pt-BR'))
             .forEach(produto => linhas.push(montarLinhaEstoqueMensagem(produto)));
     });
+
+    linhas.push(
+        '',
+        '*TOTAL*',
+        `Custo em estoque: ${formatarMoeda(totais.custo)}`,
+        `Vendas possÃ­veis: ${formatarMoeda(totais.venda)}`,
+        `DiferenÃ§a bruta: ${formatarMoeda(totais.venda - totais.custo)}`
+    );
 
     return linhas.join('\n');
 }
@@ -2950,6 +2979,212 @@ function obterFiltroHistorico() {
         periodo: document.getElementById('filtroPeriodoHistorico')?.value || 'todos',
         busca: normalizarComparacao(document.getElementById('filtroClienteHistorico')?.value || '')
     };
+}
+
+function obterTextoBuscaHistorico() {
+    return (document.getElementById('filtroClienteHistorico')?.value || '').trim();
+}
+
+function obterLabelPeriodoHistorico(periodo) {
+    const labels = {
+        hoje: 'Hoje',
+        semana: 'Últimos 7 dias',
+        mes: 'Últimos 30 dias',
+        todos: 'Todos os períodos'
+    };
+    return labels[periodo] || periodo;
+}
+
+function obterDataMensagem(valor, incluirHora = false) {
+    const data = converterData(valor);
+    if (!data) return '-';
+    if (!incluirHora) return data.toLocaleDateString('pt-BR');
+    return `${data.toLocaleDateString('pt-BR')} ${data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+}
+
+async function obterVendasHistoricoFiltradas() {
+    const { periodo, busca } = obterFiltroHistorico();
+    const dataInicio = obterDataInicioHistorico(periodo);
+    const snapshot = await window.getDocs(window.collection(window.db, 'vendas'));
+    const vendas = [];
+
+    snapshot.forEach(doc => {
+        const v = doc.data();
+        if (!dentroDoPeriodo(v.data, dataInicio, periodo)) return;
+
+        const textoBusca = normalizarComparacao([
+            v.produto,
+            v.marca,
+            v.sabor,
+            v.peso,
+            v.cliente,
+            v.contato,
+            v.pagamento
+        ].filter(Boolean).join(' '));
+
+        if (busca && !textoBusca.includes(busca)) return;
+        vendas.push({ ...v, id: doc.id });
+    });
+
+    return vendas.sort((a, b) => new Date(b.data) - new Date(a.data));
+}
+
+async function obterComprasHistoricoFiltradas() {
+    const { periodo, busca } = obterFiltroHistorico();
+    const dataInicio = obterDataInicioHistorico(periodo);
+    const snapshot = await window.getDocs(window.collection(window.db, 'compras'));
+    const compras = [];
+
+    snapshot.forEach(doc => {
+        const c = doc.data();
+        const dataCompra = c.dataCompra || c.data || c.dataCriacao;
+        if (!dentroDoPeriodo(dataCompra, dataInicio, periodo)) return;
+
+        const textoBusca = normalizarComparacao([
+            c.produto,
+            c.marca,
+            c.sabor,
+            c.peso,
+            c.familia,
+            c.valorSugerido,
+            c.custoUnitario
+        ].filter(Boolean).join(' '));
+
+        if (busca && !textoBusca.includes(busca)) return;
+        compras.push({ ...c, id: doc.id, dataHistorico: dataCompra });
+    });
+
+    return compras.sort((a, b) => (converterData(b.dataHistorico) || new Date(0)) - (converterData(a.dataHistorico) || new Date(0)));
+}
+
+function montarCabecalhoRelatorioMensagem(titulo, periodo, buscaTexto) {
+    const linhas = [
+        titulo,
+        `Período: ${obterLabelPeriodoHistorico(periodo)}`,
+        `Gerado em ${obterDataMensagem(new Date(), true)}`
+    ];
+
+    if (buscaTexto) {
+        linhas.push(`Filtro: ${buscaTexto}`);
+    }
+
+    return linhas;
+}
+
+function montarLinhaVendaMensagem(venda) {
+    const quantidade = converterNumero(venda.quantidade) || 1;
+    const pagamento = normalizarFormaPagamento(venda.pagamento) || '-';
+    const parcelas = converterNumero(venda.parcelas);
+    const formaPagamento = `${pagamento}${parcelas > 1 ? ` ${parcelas}x` : ''}`;
+    const valorBase = venda.valorBase !== undefined ? converterNumero(venda.valorBase) : converterNumero(venda.valorTotal);
+    const status = venda.cancelada === true ? ' - CANCELADA' : '';
+
+    return `${obterDataMensagem(venda.data)} - ${quantidade}x - ${limparTextoMensagem(venda.produto)} - ${limparTextoMensagem(venda.sabor, 'Sem sabor')} - ${limparTextoMensagem(venda.marca)} - ${formatarMoeda(valorBase)} - ${formaPagamento}${venda.cliente ? ` - ${limparTextoMensagem(venda.cliente)}` : ''}${status}`;
+}
+
+function montarRelatorioVendasMensagem(vendas) {
+    const { periodo } = obterFiltroHistorico();
+    const buscaTexto = obterTextoBuscaHistorico();
+    const ativas = vendas.filter(v => v.cancelada !== true);
+    const canceladas = vendas.length - ativas.length;
+    const totalBruto = ativas.reduce((acc, v) => acc + (v.valorBase !== undefined ? converterNumero(v.valorBase) : converterNumero(v.valorTotal)), 0);
+    const totalLiquido = ativas.reduce((acc, v) => acc + (v.valorLiquido !== undefined ? converterNumero(v.valorLiquido) : converterNumero(v.valorTotal)), 0);
+    const totalCusto = ativas.reduce((acc, v) => acc + converterNumero(v.custoTotal), 0);
+    const totalLucro = ativas.reduce((acc, v) => acc + (v.lucro !== undefined ? converterNumero(v.lucro) : ((v.valorLiquido !== undefined ? converterNumero(v.valorLiquido) : converterNumero(v.valorTotal)) - converterNumero(v.custoTotal))), 0);
+    const totalItens = ativas.reduce((acc, v) => acc + converterNumero(v.quantidade), 0);
+    const totalTaxas = ativas.reduce((acc, v) => acc + converterNumero(v.taxaValor), 0);
+    const totalDescontos = ativas.reduce((acc, v) => acc + converterNumero(v.descontoTotal), 0);
+
+    const linhas = montarCabecalhoRelatorioMensagem('💰 *RELATÓRIO DE VENDAS - MUNDO MAROMBA* 💰', periodo, buscaTexto);
+    linhas.push(
+        '',
+        '*RESUMO*',
+        `Vendas ativas: ${ativas.length}`,
+        `Itens vendidos: ${totalItens}`,
+        `Faturamento: ${formatarMoeda(totalBruto)}`,
+        `Líquido: ${formatarMoeda(totalLiquido)}`,
+        `Custo: ${formatarMoeda(totalCusto)}`,
+        `Lucro: ${formatarMoeda(totalLucro)}`,
+        `Taxas: ${formatarMoeda(totalTaxas)}`,
+        `Descontos: ${formatarMoeda(totalDescontos)}`,
+        `Canceladas: ${canceladas}`,
+        '',
+        '*HISTÓRICO*'
+    );
+
+    vendas.forEach(venda => linhas.push(montarLinhaVendaMensagem(venda)));
+    return linhas.join('\n');
+}
+
+function montarLinhaCompraMensagem(compra) {
+    const quantidade = converterNumero(compra.quantidade);
+    const valorTotal = converterNumero(compra.valorTotal);
+    const custoUnitario = converterNumero(compra.custoUnitario) || (quantidade > 0 ? valorTotal / quantidade : 0);
+    const valorSugerido = converterNumero(compra.valorSugerido);
+
+    return `${obterDataMensagem(compra.dataHistorico || compra.dataCompra || compra.data)} - ${quantidade}x - ${limparTextoMensagem(compra.produto)} - ${limparTextoMensagem(compra.sabor, 'Sem sabor')} - ${limparTextoMensagem(compra.marca)} - custo ${formatarValorMensagem(custoUnitario)} - total ${formatarMoeda(valorTotal)}${valorSugerido > 0 ? ` - venda ${formatarValorMensagem(valorSugerido)}` : ''}`;
+}
+
+function montarRelatorioComprasMensagem(compras) {
+    const { periodo } = obterFiltroHistorico();
+    const buscaTexto = obterTextoBuscaHistorico();
+    const totalComprado = compras.reduce((acc, c) => acc + converterNumero(c.valorTotal), 0);
+    const totalUnidades = compras.reduce((acc, c) => acc + converterNumero(c.quantidade), 0);
+    const produtosUnicos = new Set(compras.map(c => criarChaveProduto(c.produto, c.marca, c.sabor, c.peso))).size;
+    const custoMedio = totalUnidades > 0 ? totalComprado / totalUnidades : 0;
+
+    const linhas = montarCabecalhoRelatorioMensagem('🛒 *RELATÓRIO DE COMPRAS - MUNDO MAROMBA* 🛒', periodo, buscaTexto);
+    linhas.push(
+        '',
+        '*RESUMO*',
+        `Compras registradas: ${compras.length}`,
+        `Produtos únicos: ${produtosUnicos}`,
+        `Unidades compradas: ${totalUnidades}`,
+        `Total pago: ${formatarMoeda(totalComprado)}`,
+        `Custo médio: ${formatarMoeda(custoMedio)}`,
+        '',
+        '*HISTÓRICO*'
+    );
+
+    compras.forEach(compra => linhas.push(montarLinhaCompraMensagem(compra)));
+    return linhas.join('\n');
+}
+
+async function copiarRelatorioHistoricoWhatsApp(tipo) {
+    const botaoId = tipo === 'compras' ? 'copiarRelatorioComprasWhatsapp' : 'copiarRelatorioVendasWhatsapp';
+    const botao = document.getElementById(botaoId);
+    const textoOriginal = botao?.innerHTML;
+
+    try {
+        if (botao) {
+            botao.disabled = true;
+            botao.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Copiando...';
+        }
+
+        const itens = tipo === 'compras'
+            ? await obterComprasHistoricoFiltradas()
+            : await obterVendasHistoricoFiltradas();
+
+        if (itens.length === 0) {
+            mostrarNotificacao(`Nenhum registro de ${tipo} encontrado para copiar.`, 'aviso');
+            return;
+        }
+
+        const mensagem = tipo === 'compras'
+            ? montarRelatorioComprasMensagem(itens)
+            : montarRelatorioVendasMensagem(itens);
+
+        await copiarTextoParaAreaTransferencia(mensagem);
+        mostrarNotificacao(`Relatório de ${tipo} copiado! ${itens.length} registro(s).`, 'sucesso');
+    } catch (error) {
+        console.error(`Erro ao copiar relatório de ${tipo}:`, error);
+        mostrarNotificacao(`Erro ao copiar relatório: ${error.message}`, 'erro');
+    } finally {
+        if (botao) {
+            botao.disabled = false;
+            botao.innerHTML = textoOriginal || '<i class="fab fa-whatsapp"></i> Copiar';
+        }
+    }
 }
 
 function formatarDataHoraHistorico(valor) {
