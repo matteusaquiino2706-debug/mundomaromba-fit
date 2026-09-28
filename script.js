@@ -103,6 +103,32 @@ function calcularSaldoLote(lote) {
     return Math.max(0, quantidade - vendido);
 }
 
+function obterTimestampLote(lote) {
+    return [
+        lote?.dataCriacao,
+        lote?.dataCompra,
+        lote?.data,
+        lote?.dataHistorico
+    ].reduce((maisRecente, valor) => {
+        const data = converterData(valor);
+        return data ? Math.max(maisRecente, data.getTime()) : maisRecente;
+    }, 0);
+}
+
+function obterValorSugeridoMaisRecente(lotes) {
+    return (lotes || []).reduce((atual, lote) => {
+        const valor = converterNumero(lote?.valorSugerido);
+        if (valor <= 0) return atual;
+
+        const timestamp = obterTimestampLote(lote);
+        if (!atual || timestamp >= atual.timestamp) {
+            return { valor, timestamp };
+        }
+
+        return atual;
+    }, null)?.valor || null;
+}
+
 function converterData(valor) {
     if (!valor) return null;
     if (valor instanceof Date) return valor;
@@ -720,6 +746,7 @@ async function carregarProdutosCompraRapida() {
                     peso: lote.peso || '',
                     familia: lote.familia || 'Outros',
                     valorSugerido: null,
+                    valorSugeridoData: 0,
                     imagemUrl: '',
                     totalComprado: 0
                 };
@@ -727,8 +754,11 @@ async function carregarProdutosCompraRapida() {
 
             produtosCompraCache[chave].totalComprado += converterNumero(lote.quantidade);
 
-            if (converterNumero(lote.valorSugerido) > 0) {
-                produtosCompraCache[chave].valorSugerido = converterNumero(lote.valorSugerido);
+            const valorSugeridoLote = converterNumero(lote.valorSugerido);
+            const dataLote = obterTimestampLote(lote);
+            if (valorSugeridoLote > 0 && dataLote >= produtosCompraCache[chave].valorSugeridoData) {
+                produtosCompraCache[chave].valorSugerido = valorSugeridoLote;
+                produtosCompraCache[chave].valorSugeridoData = dataLote;
             }
 
             if (lote.imagemUrl) {
@@ -1974,14 +2004,11 @@ async function buscarInfoProduto() {
 
         let totalCusto = 0;
         let totalUnidades = 0;
-        let valorSugerido = null;
+        const valorSugerido = obterValorSugeridoMaisRecente(lotes);
 
         lotes.forEach(lote => {
-            totalCusto += lote.saldo * lote.custoUnitario;
+            totalCusto += converterNumero(lote.saldo) * converterNumero(lote.custoUnitario);
             totalUnidades += lote.saldo;
-            if (lote.valorSugerido) {
-                valorSugerido = lote.valorSugerido;
-            }
         });
 
         if (totalUnidades === 0) {
@@ -2028,12 +2055,7 @@ async function preencherPrecoSugerido() {
 
         const lotes = await buscarLotesDisponiveisPorProduto(produtoSelecionado);
 
-        let valorSugerido = null;
-        lotes.forEach(lote => {
-            if (lote.saldo > 0 && lote.valorSugerido) {
-                valorSugerido = lote.valorSugerido;
-            }
-        });
+        const valorSugerido = obterValorSugeridoMaisRecente(lotes);
 
         precoSugeridoAtualVenda = valorSugerido || null;
 
@@ -2118,8 +2140,7 @@ function obterValorVendaMensagem(produto) {
     const valorProduto = converterNumero(produto.valorSugerido);
     if (valorProduto > 0) return valorProduto;
 
-    const loteComValor = produto.lotes.find(lote => converterNumero(lote.valorSugerido) > 0);
-    return loteComValor ? converterNumero(loteComValor.valorSugerido) : 0;
+    return obterValorSugeridoMaisRecente(produto.lotes) || 0;
 }
 
 function montarLinhaEstoqueMensagem(produto) {
@@ -2201,19 +2222,24 @@ async function obterProdutosEstoqueParaMensagem() {
                 familia: lote.familia || 'Outros',
                 totalDisponivel: 0,
                 valorSugerido: null,
+                valorSugeridoData: 0,
                 lotes: []
             };
         }
 
         const valorSugerido = converterNumero(lote.valorSugerido);
+        const dataLote = obterTimestampLote(lote);
         produtos[chave].totalDisponivel += saldo;
-        if (valorSugerido > 0 && !produtos[chave].valorSugerido) {
+        if (valorSugerido > 0 && dataLote >= produtos[chave].valorSugeridoData) {
             produtos[chave].valorSugerido = valorSugerido;
+            produtos[chave].valorSugeridoData = dataLote;
         }
         produtos[chave].lotes.push({
             saldo,
             custoUnitario: converterNumero(lote.custoUnitario),
-            valorSugerido
+            valorSugerido,
+            dataCompra: lote.dataCompra,
+            dataCriacao: lote.dataCriacao
         });
     });
 
@@ -2315,6 +2341,7 @@ async function carregarEstoqueLotes() {
                     imagemUrl: l.imagemUrl || '',
                     totalDisponivel: 0,
                     valorSugerido: null,
+                    valorSugeridoData: 0,
                     custoUnitario: l.custoUnitario || 0,
                     lotes: []
                 };
@@ -2322,6 +2349,7 @@ async function carregarEstoqueLotes() {
             produtos[chave].lotes.push({
                 id: doc.id,
                 dataCompra: l.dataCompra,
+                dataCriacao: l.dataCriacao,
                 quantidade: converterNumero(l.quantidade),
                 vendido: converterNumero(l.vendido),
                 saldo: saldo,
@@ -2331,8 +2359,10 @@ async function carregarEstoqueLotes() {
             });
             produtos[chave].totalDisponivel += saldo;
             const valorSugeridoLote = converterNumero(l.valorSugerido);
-            if (valorSugeridoLote > 0 && !produtos[chave].valorSugerido) {
+            const dataLote = obterTimestampLote(l);
+            if (valorSugeridoLote > 0 && dataLote >= produtos[chave].valorSugeridoData) {
                 produtos[chave].valorSugerido = valorSugeridoLote;
+                produtos[chave].valorSugeridoData = dataLote;
             }
         });
 
